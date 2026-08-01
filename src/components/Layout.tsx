@@ -44,9 +44,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="flex h-14 items-center gap-2 border-b border-slate-100 px-5">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-600 text-sm font-bold text-white">
-            B
+            M
           </div>
-          <span className="text-[15px] font-bold tracking-tight text-slate-800">BillFlow</span>
+          <span className="text-[15px] font-bold tracking-tight text-slate-800">Magizhini</span>
           <button className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X className="h-5 w-5 text-slate-400" />
           </button>

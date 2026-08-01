@@ -9,28 +9,34 @@ import type {
   Settings,
   User,
 } from './types'
-import { load, save, resetDatabase, uid } from './db'
+import { load, save, resetDatabase, uid, emptyDatabase } from './db'
 import { commitBillNumbers, commitQuoteNumbers } from './numbering'
 import { billTotals } from './calc'
 import { todayISO } from './format'
+import { isSupabaseConfigured, supabase } from './supabase'
+import * as remote from './remote'
 
-const ACTIVE_COMPANY_KEY = 'billflow.activeCompany'
-const SESSION_KEY = 'billflow.session'
+const ACTIVE_COMPANY_KEY = 'magizhini.activeCompany'
+const SESSION_KEY = 'magizhini.session'
+
+export type BackendMode = 'local' | 'supabase'
 
 interface StoreValue {
   db: Database
   currentUser: User | null
+  mode: BackendMode
+  ready: boolean // false while a Supabase session/data load is in flight
   activeCompanyId: string | 'ALL'
   setActiveCompanyId: (id: string | 'ALL') => void
   activeCompany: Company | undefined
 
   // auth
-  login: (email: string, password: string) => { ok: boolean; error?: string }
-  logout: () => void
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  logout: () => Promise<void>
 
   // users (Admin)
-  saveUser: (u: Partial<User> & { id?: string }) => { ok: boolean; error?: string }
-  deleteUser: (id: string) => { ok: boolean; error?: string }
+  saveUser: (u: Partial<User> & { id?: string }) => Promise<{ ok: boolean; error?: string }>
+  deleteUser: (id: string) => Promise<{ ok: boolean; error?: string }>
 
   // companies
   saveCompany: (c: Partial<Company> & { id?: string }) => Company
@@ -96,8 +102,11 @@ export interface QuoteDraft {
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [db, setDb] = useState<Database>(() => load())
+  const mode: BackendMode = isSupabaseConfigured ? 'supabase' : 'local'
+  const [db, setDb] = useState<Database>(() => (mode === 'supabase' ? emptyDatabase() : load()))
+  const [ready, setReady] = useState(mode === 'local')
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (mode === 'supabase') return null
     try {
       const raw = sessionStorage.getItem(SESSION_KEY)
       return raw ? (JSON.parse(raw) as User) : null
@@ -113,15 +122,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return db.companies[0]?.id || 'ALL'
   })
 
-  // Persist whenever db changes.
-  useEffect(() => {
-    save(db)
-  }, [db])
-
   const setActiveCompanyId = useCallback((id: string | 'ALL') => {
     setActiveCompanyIdState(id)
     localStorage.setItem(ACTIVE_COMPANY_KEY, id)
   }, [])
+
+  // Once companies load (Supabase), make sure the active company points at a real one.
+  useEffect(() => {
+    if (activeCompanyId !== 'ALL' && db.companies.length && !db.companies.some((c) => c.id === activeCompanyId)) {
+      setActiveCompanyId(db.companies[0].id)
+    }
+  }, [db.companies, activeCompanyId, setActiveCompanyId])
 
   const activeCompany = useMemo(
     () => (activeCompanyId === 'ALL' ? undefined : db.companies.find((c) => c.id === activeCompanyId)),
@@ -137,9 +148,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  // ---- Supabase session + cloud load ----
+  const loadCloud = useCallback(async (authUser: { id: string; email?: string }) => {
+    try {
+      await remote.seedIfEmpty()
+      const data = await remote.fetchAll()
+      setDb(data as Database)
+      const profile = data.users.find((u) => u.id === authUser.id)
+      setCurrentUser(
+        profile ?? { id: authUser.id, name: authUser.email ?? 'User', email: authUser.email ?? '', role: 'Operator', password: '' },
+      )
+    } catch (e) {
+      console.error('Cloud load failed', e)
+    } finally {
+      setReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (mode !== 'supabase' || !supabase) return
+    let active = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      if (data.session?.user) void loadCloud(data.session.user)
+      else setReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setCurrentUser(null)
+        setDb(emptyDatabase())
+      }
+    })
+    return () => { active = false; sub.subscription.unsubscribe() }
+  }, [mode, loadCloud])
+
+  // Persist changes. Local → localStorage. Supabase → debounced full sync,
+  // skipping the first run after hydrate so we don't re-upload what we just read.
+  const skipSync = React.useRef(true)
+  useEffect(() => {
+    if (mode === 'local') { save(db); return }
+    if (!ready || !currentUser) return
+    if (skipSync.current) { skipSync.current = false; return }
+    const handle = setTimeout(() => { void remote.syncAll(db).catch((e) => console.error('Sync failed', e)) }, 500)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db])
+
   // ---- Auth ----
   const login: StoreValue['login'] = useCallback(
-    (email, password) => {
+    async (email, password) => {
+      if (mode === 'supabase') {
+        if (!supabase) return { ok: false, error: 'Supabase is not configured' }
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        if (error || !data.user) return { ok: false, error: error?.message ?? 'Login failed' }
+        await loadCloud(data.user)
+        return { ok: true }
+      }
       const user = db.users.find(
         (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
       )
@@ -148,23 +212,46 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
       return { ok: true }
     },
-    [db.users],
+    [mode, db.users, loadCloud],
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (mode === 'supabase' && supabase) {
+      await supabase.auth.signOut()
+      setCurrentUser(null)
+      setDb(emptyDatabase())
+      return
+    }
     setCurrentUser(null)
     sessionStorage.removeItem(SESSION_KEY)
-  }, [])
+  }, [mode])
 
   // ---- Users (Admin) ----
   const saveUser: StoreValue['saveUser'] = useCallback(
-    (u) => {
+    async (u) => {
       const email = (u.email ?? '').trim().toLowerCase()
       if (!u.name?.trim()) return { ok: false, error: 'Name is required' }
       if (!email) return { ok: false, error: 'Email is required' }
       const clash = db.users.find((x) => x.email.toLowerCase() === email && x.id !== u.id)
       if (clash) return { ok: false, error: 'That email is already in use' }
       if (!u.id && !u.password?.trim()) return { ok: false, error: 'Password is required for a new user' }
+
+      if (mode === 'supabase') {
+        try {
+          if (u.id) {
+            await remote.updateProfileRole(u.id, u.role ?? 'Operator', u.name.trim())
+          } else {
+            await remote.adminCreateUser({ name: u.name.trim(), email, password: u.password!.trim(), role: u.role ?? 'Operator' })
+          }
+          const users = await remote.fetchUsers()
+          mutate((d) => { d.users = users })
+          skipSync.current = true // this change is already persisted server-side
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, error: (e as Error).message }
+        }
+      }
+
       mutate((d) => {
         const idx = d.users.findIndex((x) => x.id === u.id)
         if (idx >= 0) {
@@ -182,21 +269,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       })
       return { ok: true }
     },
-    [mutate, db.users],
+    [mutate, db.users, mode],
   )
 
   const deleteUser: StoreValue['deleteUser'] = useCallback(
-    (id) => {
+    async (id) => {
       if (id === currentUser?.id) return { ok: false, error: 'You cannot delete the account you are signed in with' }
       const target = db.users.find((u) => u.id === id)
       if (target?.role === 'Admin' && db.users.filter((u) => u.role === 'Admin').length <= 1)
         return { ok: false, error: 'At least one Admin must remain' }
+
+      if (mode === 'supabase') {
+        try {
+          await remote.adminDeleteUser(id)
+          mutate((d) => { d.users = d.users.filter((u) => u.id !== id) })
+          skipSync.current = true
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, error: (e as Error).message }
+        }
+      }
+
       mutate((d) => {
         d.users = d.users.filter((u) => u.id !== id)
       })
       return { ok: true }
     },
-    [mutate, db.users, currentUser],
+    [mutate, db.users, currentUser, mode],
   )
 
   // ---- Companies ----
@@ -237,9 +336,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       mutate((d) => {
         d.companies = d.companies.filter((c) => c.id !== id)
       })
+      if (mode === 'supabase') void remote.deleteRow('companies', id).catch((e) => console.error(e))
       if (activeCompanyId === id) setActiveCompanyId(db.companies.find((c) => c.id !== id)?.id || 'ALL')
     },
-    [mutate, activeCompanyId, db.companies, setActiveCompanyId],
+    [mutate, activeCompanyId, db.companies, setActiveCompanyId, mode],
   )
 
   // ---- Customers ----
@@ -265,8 +365,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   )
 
   const deleteCustomer: StoreValue['deleteCustomer'] = useCallback(
-    (id) => mutate((d) => { d.customers = d.customers.filter((c) => c.id !== id) }),
-    [mutate],
+    (id) => {
+      mutate((d) => { d.customers = d.customers.filter((c) => c.id !== id) })
+      if (mode === 'supabase') void remote.deleteRow('customers', id).catch((e) => console.error(e))
+    },
+    [mutate, mode],
   )
 
   // ---- Bills ----
@@ -532,16 +635,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   )
 
   const reset = useCallback(() => {
+    if (mode === 'supabase') return // never wipe the shared cloud database from the UI
     const fresh = resetDatabase()
     setDb(fresh)
     setActiveCompanyId(fresh.companies[0]?.id || 'ALL')
-  }, [setActiveCompanyId])
+  }, [setActiveCompanyId, mode])
 
   const reload = useCallback(() => setDb(load()), [])
 
   const value: StoreValue = {
     db,
     currentUser,
+    mode,
+    ready,
     activeCompanyId,
     setActiveCompanyId,
     activeCompany,

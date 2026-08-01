@@ -5,10 +5,31 @@
 import type { Database } from './types'
 import { PRINT_TECHNOLOGY_LOGO, SHRAVAN_INFOTECH_LOGO } from './logos'
 
-const STORAGE_KEY = 'billflow.db.v3'
+const STORAGE_KEY = 'magizhini.db.v3'
 
 export function uid(): string {
   return crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2, 11)
+}
+
+// An empty database with sane defaults — used as the initial state in Supabase
+// mode before the cloud data has loaded.
+export function emptyDatabase(): Database {
+  return {
+    users: [],
+    companies: [],
+    customers: [],
+    bills: [],
+    quotations: [],
+    settings: {
+      currency: '₹',
+      dateFormat: 'dd-MM-yyyy',
+      defaultTaxRate: 18,
+      fyStartMonth: 4,
+      invoiceFooter: 'This is a computer-generated document.',
+      taxRates: [0, 5, 12, 18, 28],
+    },
+    counters: { billNo: 0, quoteNo: 0, companyBillSeq: {}, companyQuoteSeq: {} },
+  }
 }
 
 export function seedDatabase(): Database {
@@ -19,8 +40,8 @@ export function seedDatabase(): Database {
 
   const db: Database = {
     users: [
-      { id: adminId, name: 'Nagaraj', email: 'admin@billflow.app', role: 'Admin', password: 'admin123' },
-      { id: uid(), name: 'Operator', email: 'operator@billflow.app', role: 'Operator', password: 'operator123' },
+      { id: adminId, name: 'Nagaraj', email: 'admin@magizhini.app', role: 'Admin', password: 'admin123' },
+      { id: uid(), name: 'Operator', email: 'operator@magizhini.app', role: 'Operator', password: 'operator123' },
     ],
     companies: [
       {

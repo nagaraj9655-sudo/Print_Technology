@@ -4,15 +4,19 @@ import { useToast } from '../components/ui'
 import { Lock, Mail } from 'lucide-react'
 
 export default function Login() {
-  const { login } = useStore()
+  const { login, mode } = useStore()
   const toast = useToast()
-  const [email, setEmail] = useState('admin@billflow.app')
-  const [password, setPassword] = useState('admin123')
+  const [email, setEmail] = useState(mode === 'supabase' ? '' : 'admin@magizhini.app')
+  const [password, setPassword] = useState(mode === 'supabase' ? '' : 'admin123')
   const [error, setError] = useState('')
 
-  const submit = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const res = login(email, password)
+    setError('')
+    setBusy(true)
+    const res = await login(email, password)
+    setBusy(false)
     if (!res.ok) {
       setError(res.error ?? 'Login failed')
     } else {
@@ -25,9 +29,9 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-xl font-bold text-white shadow-soft">
-            B
+            M
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800">BillFlow</h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-800">Magizhini</h1>
           <p className="text-sm text-slate-500">Billing &amp; Quotation Management</p>
         </div>
 
@@ -60,17 +64,23 @@ export default function Login() {
             </div>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" className="btn-primary w-full">
-            Sign in
+          <button type="submit" className="btn-primary w-full" disabled={busy}>
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
-          <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-            <p className="font-medium text-slate-600">Demo accounts</p>
-            <p>Admin — admin@billflow.app / admin123</p>
-            <p>Operator — operator@billflow.app / operator123</p>
-          </div>
+          {mode === 'local' ? (
+            <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+              <p className="font-medium text-slate-600">Demo accounts</p>
+              <p>Admin — admin@magizhini.app / admin123</p>
+              <p>Operator — operator@magizhini.app / operator123</p>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+              Sign in with your Supabase account. The first user to sign up becomes the Admin.
+            </p>
+          )}
         </form>
         <p className="mt-4 text-center text-xs text-slate-400">
-          Client-side demo · data stored locally in your browser
+          {mode === 'supabase' ? 'Connected to Supabase · secure cloud database' : 'Client-side mode · data stored locally in your browser'}
         </p>
       </div>
     </div>

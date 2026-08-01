@@ -1,4 +1,4 @@
-# BillFlow — Multi-Company Billing & Quotation Management
+# Magizhini — Multi-Company Billing & Quotation Management
 
 A professional, modern web application for running **billing (invoicing)** and **quotation** operations across **any number of companies** from a single login. Built to replace the `NAGARAJ_BILL.xlsx` spreadsheet workflow while preserving every field and adding the things a spreadsheet can't do: atomic numbering, derived totals, per-company GST, branded PDFs, dashboards, and reports.
 
@@ -19,8 +19,8 @@ Open the printed URL (default http://localhost:5173).
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@billflow.app` | `admin123` |
-| Operator | `operator@billflow.app` | `operator123` |
+| Admin | `admin@magizhini.app` | `admin123` |
+| Operator | `operator@magizhini.app` | `operator123` |
 
 The app **seeds itself** on first run with the two existing companies (**Print Technology** — GST registered, **Shravan Infotech** — non-GST), a few customers, and sample bills/quotations so the dashboard and reports aren't empty. Reset anytime from **Settings → Reset to demo data**.
 
@@ -35,6 +35,47 @@ Deploy `dist/` to any static host. Because it's a single-page app the host must 
 
 ---
 
+## Connect Supabase (real login + cloud database)
+
+The app runs in **two modes**, chosen automatically:
+
+- **Local mode** (no env set) — data in the browser, demo logins above. Great for trying it out.
+- **Supabase mode** (env set) — real email/password accounts, a Postgres database with row-level security, and data that syncs across every device.
+
+### 1. Create the project & tables
+1. Sign up at **https://supabase.com** → **New project** (pick a name + a strong database password; choose a region near you).
+2. Open **SQL Editor → New query**, paste the entire contents of [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. This creates all tables, security policies, and the profile/role logic.
+3. In **Project Settings → API**, copy the **Project URL** and the **anon public** key.
+
+### 2. Point the app at Supabase
+Create a `.env` file (copy from [`.env.example`](.env.example)) with:
+```
+VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
+```
+Restart `npm run dev`. The login screen now says “Connected to Supabase”.
+
+### 3. Create your first account
+- In Supabase → **Authentication → Users → Add user** (set email + password, tick *Auto Confirm*). The **first** user automatically becomes the **Admin**; the app then auto-seeds your two companies on first login.
+- Or, once the Edge Function below is deployed, use the in-app **Users → Add User**.
+
+### 4. (Optional) Enable in-app “Admin creates users”
+Creating login accounts from inside the app needs a tiny server function (so the secret key stays off the browser). One-time setup:
+```bash
+npm i -g supabase
+supabase login
+supabase link --project-ref YOUR-PROJECT-REF
+supabase functions deploy admin-create-user
+```
+(`YOUR-PROJECT-REF` is in your Supabase project URL / Settings → General.) Until this is deployed, add users via the Supabase dashboard; **role changes** in the app work either way.
+
+### 5. Add the same keys to Vercel
+Vercel → your project → **Settings → Environment Variables** → add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (for **Production** + **Preview**), then **redeploy**. Your live site is now on Supabase.
+
+> **Security model:** the anon key is public by design; row-level security in Postgres is what protects data. All authenticated users of this project share the organisation's data (the two companies are yours). The `service_role` key is used **only** inside the Edge Function, never in the browser.
+
+---
+
 ## Deploy to GitHub + Vercel (step by step)
 
 ### A. Put the project on GitHub
@@ -45,14 +86,14 @@ Deploy `dist/` to any static host. Because it's a single-page app the host must 
    ```bash
    git init
    git add .
-   git commit -m "BillFlow: billing & quotation app"
+   git commit -m "Magizhini: billing & quotation app"
    ```
    (`node_modules` and `dist` are already ignored via `.gitignore`.)
-4. **Create an empty repo** on GitHub: click **New repository**, name it e.g. `billflow`, leave it empty (no README/.gitignore), click **Create**.
+4. **Create an empty repo** on GitHub: click **New repository**, name it e.g. `magizhini`, leave it empty (no README/.gitignore), click **Create**.
 5. **Connect and push** (copy the URL GitHub shows, then):
    ```bash
    git branch -M main
-   git remote add origin https://github.com/<your-username>/billflow.git
+   git remote add origin https://github.com/<your-username>/magizhini.git
    git push -u origin main
    ```
    If prompted to sign in, use the browser pop-up (or a Personal Access Token as the password).
@@ -60,12 +101,12 @@ Deploy `dist/` to any static host. Because it's a single-page app the host must 
 ### B. Deploy on Vercel
 
 1. Go to https://vercel.com and **Sign up with GitHub** (authorise access).
-2. Click **Add New… → Project**, then **Import** your `billflow` repo.
+2. Click **Add New… → Project**, then **Import** your `magizhini` repo.
 3. Vercel auto-detects **Vite**. Confirm the settings (they should already match):
    - **Framework Preset:** Vite
    - **Build Command:** `npm run build`
    - **Output Directory:** `dist`
-4. Click **Deploy**. In ~1 minute you get a live URL like `https://billflow-xxxx.vercel.app`.
+4. Click **Deploy**. In ~1 minute you get a live URL like `https://magizhini-xxxx.vercel.app`.
 5. **Every future `git push` to `main` auto-deploys.** To update the live site:
    ```bash
    git add .

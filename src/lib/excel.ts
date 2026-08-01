@@ -193,5 +193,5 @@ export function exportFullBackup(db: { bills: Bill[]; quotations: Quotation[]; c
   XLSX.utils.book_append_sheet(wb, billsWs, 'Bills')
   const quotesWs = XLSX.utils.json_to_sheet(db.quotations.map(({ items, ...q }) => ({ ...q, itemCount: items.length })))
   XLSX.utils.book_append_sheet(wb, quotesWs, 'Quotations')
-  download(wb, `BillFlow_Backup_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  download(wb, `Magizhini_Backup_${new Date().toISOString().slice(0, 10)}.xlsx`)
 }

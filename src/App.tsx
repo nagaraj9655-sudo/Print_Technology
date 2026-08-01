@@ -16,7 +16,18 @@ import Settings from './pages/Settings'
 import Users from './pages/Users'
 
 export default function App() {
-  const { currentUser } = useStore()
+  const { currentUser, ready } = useStore()
+
+  if (!ready) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" />
+          <p className="text-sm">Connecting…</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!currentUser) return <Login />
 

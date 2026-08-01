@@ -19,7 +19,7 @@ export default function Users() {
 
   const onDelete = async (u: User) => {
     if (await confirm(`Remove user ${u.name} (${u.email})?`)) {
-      const res = deleteUser(u.id)
+      const res = await deleteUser(u.id)
       if (res.ok) toast('User removed')
       else toast(res.error ?? 'Could not remove user', 'error')
     }
@@ -94,8 +94,8 @@ export default function Users() {
         <UserModal
           user={editing}
           onClose={() => setOpen(false)}
-          onSave={(data) => {
-            const res = saveUser(data)
+          onSave={async (data) => {
+            const res = await saveUser(data)
             if (res.ok) { toast(editing ? 'User updated' : 'User created'); setOpen(false) }
             else toast(res.error ?? 'Could not save', 'error')
           }}
@@ -107,10 +107,12 @@ export default function Users() {
 }
 
 function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () => void; onSave: (u: Partial<User> & { id?: string }) => void }) {
+  const { mode } = useStore()
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [role, setRole] = useState<Role>(user?.role ?? 'Operator')
   const [password, setPassword] = useState('')
+  const emailLocked = mode === 'supabase' && !!user // email is the Supabase login id; don't change it here
 
   return (
     <Modal open onClose={onClose} title={user ? 'Edit user' : 'Add user'}>
@@ -121,7 +123,7 @@ function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () =
         </div>
         <div>
           <label className="label">Email *</label>
-          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={emailLocked} />
         </div>
         <div>
           <label className="label">Role</label>
@@ -130,16 +132,22 @@ function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () =
             <option value="Admin">Admin</option>
           </select>
         </div>
-        <div>
-          <label className="label">{user ? 'New password (blank = unchanged)' : 'Password *'}</label>
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input className="input pl-9" type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={user ? '••••••••' : 'Set a password'} />
+        {!(mode === 'supabase' && user) && (
+          <div>
+            <label className="label">{user ? 'New password (blank = unchanged)' : 'Password *'}</label>
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input className="input pl-9" type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={user ? '••••••••' : 'Set a password'} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        Note: this is a client-side demo — passwords are stored in the browser. A production deployment must hash passwords server-side.
+        {mode === 'supabase'
+          ? user
+            ? 'Editing updates this user’s name and role. Password/email changes are managed in Supabase.'
+            : 'Creates a real Supabase login account (requires the admin-create-user function to be deployed — see README).'
+          : 'Note: local mode stores passwords in the browser. Switch to Supabase for secure, hashed accounts.'}
       </p>
       <div className="mt-5 flex justify-end gap-2">
         <button className="btn-outline" onClick={onClose}>Cancel</button>
