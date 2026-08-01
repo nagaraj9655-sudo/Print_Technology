@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Print Technology">
+  <defs>
+    <linearGradient id="ptbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#312e81"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#ptbg)"/>
+  <g style="mix-blend-mode:screen">
+    <circle cx="49" cy="45" r="19" fill="#22d3ee"/>
+    <circle cx="71" cy="45" r="19" fill="#ec4899"/>
+    <circle cx="60" cy="63" r="19" fill="#facc15"/>
+  </g>
+  <text x="60" y="105" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="800" fill="#ffffff" letter-spacing="2">PT</text>
+</svg>
