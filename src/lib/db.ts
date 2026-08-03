@@ -5,7 +5,7 @@
 import type { Database } from './types'
 import { PRINT_TECHNOLOGY_LOGO, SHRAVAN_INFOTECH_LOGO } from './logos'
 
-const STORAGE_KEY = 'magizhini.db.v4'
+const STORAGE_KEY = 'magizhini.db.v5'
 
 export function uid(): string {
   return crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2, 11)
@@ -27,6 +27,8 @@ export function emptyDatabase(): Database {
       fyStartMonth: 4,
       invoiceFooter: 'This is a computer-generated document.',
       taxRates: [0, 5, 12, 18, 28],
+      letterpadBillTopMm: 40,
+      letterpadQuoteTopMm: 40,
     },
     counters: { billNo: 0, quoteNo: 0, companyBillSeq: {}, companyQuoteSeq: {} },
   }
@@ -53,7 +55,9 @@ export function seedDatabase(): Database {
         gstin: '33ABCDE1234F1Z5',
         stateCode: '33',
         logoDataUrl: PRINT_TECHNOLOGY_LOGO,
-        bankDetails: 'A/c: Print Technology · A/c No: 003411100004567 · IFSC: HDFC0000341 · UPI: printtech@hdfcbank',
+        bankDetails: 'A/c: Print Technology · A/c No: 003411100004567 · IFSC: HDFC0000341',
+        upiId: 'printtech@hdfcbank',
+        payeeName: 'Print Technology',
         invoicePrefix: 'PT/',
         quotePrefix: 'PT/',
         accent: '#2563eb',
@@ -76,7 +80,9 @@ export function seedDatabase(): Database {
         gstin: '', // no GST registration -> plain invoice, no tax (§8)
         stateCode: '33',
         logoDataUrl: SHRAVAN_INFOTECH_LOGO,
-        bankDetails: 'A/c: Shravan Infotech · UPI: shravan@okicici',
+        bankDetails: 'A/c: Shravan Infotech',
+        upiId: 'shravan@okicici',
+        payeeName: 'Shravan Infotech',
         invoicePrefix: 'SI/',
         quotePrefix: 'SI/',
         accent: '#0d9488',
@@ -119,6 +125,8 @@ export function seedDatabase(): Database {
       fyStartMonth: 4,
       invoiceFooter: 'This is a computer-generated document.',
       taxRates: [0, 5, 12, 18, 28],
+      letterpadBillTopMm: 40,
+      letterpadQuoteTopMm: 40,
     },
     counters: {
       billNo: 0,

@@ -41,6 +41,8 @@ export interface Company {
   stateCode?: string // GST state code, drives intra/inter-state split
   logoDataUrl?: string // optional branded logo (data URL)
   bankDetails?: string // "Pay to" block
+  upiId?: string // UPI / VPA for GPay / PhonePe (drives payment QR + reminders)
+  payeeName?: string // name shown in the UPI app (defaults to company name)
   invoicePrefix?: string // e.g. "PT/"
   quotePrefix?: string // e.g. "PT/Q/"
   accent?: string // per-company brand accent color
@@ -154,6 +156,9 @@ export interface Settings {
   fyStartMonth: number // 4 => April (Indian FY)
   invoiceFooter: string
   taxRates: number[] // configurable list of GST rates
+  letterpadBillTopMm?: number // top space (mm) before content in letter-pad bill mode
+  letterpadQuoteTopMm?: number // top space (mm) before content in letter-pad quote mode
+  reminderTemplate?: string // optional custom reminder message intro
 }
 
 export interface Database {

@@ -230,8 +230,16 @@ function CompanyModal({
           <input className="input font-mono" value={form.quotePrefix ?? ''} onChange={(e) => set({ quotePrefix: e.target.value })} placeholder="PT/" />
         </div>
         <div className="sm:col-span-2">
-          <label className="label">Bank / UPI details</label>
-          <input className="input" value={form.bankDetails ?? ''} onChange={(e) => set({ bankDetails: e.target.value })} placeholder="A/c No · IFSC · UPI" />
+          <label className="label">Bank / account details</label>
+          <input className="input" value={form.bankDetails ?? ''} onChange={(e) => set({ bankDetails: e.target.value })} placeholder="A/c No · IFSC · Bank" />
+        </div>
+        <div>
+          <label className="label">UPI ID (GPay / PhonePe)</label>
+          <input className="input" value={form.upiId ?? ''} onChange={(e) => set({ upiId: e.target.value })} placeholder="name@bank" />
+        </div>
+        <div>
+          <label className="label">UPI payee name</label>
+          <input className="input" value={form.payeeName ?? ''} onChange={(e) => set({ payeeName: e.target.value })} placeholder="Shown in the UPI app" />
         </div>
         <div className="sm:col-span-2">
           <label className="label">Invoice terms &amp; footer</label>

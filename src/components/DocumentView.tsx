@@ -1,6 +1,7 @@
 import type { Bill, Company, DocTemplate, Quotation, Settings } from '../lib/types'
 import { billTotals, docUsesGst, lineTotal, quoteTotals, recipientInterState, type Totals } from '../lib/calc'
 import { amountInWords, formatDate, formatINR } from '../lib/format'
+import { UpiQr } from './UpiQr'
 
 // A4 print-ready invoice / quotation (§7) with per-company templates.
 //
@@ -50,6 +51,7 @@ interface Ctx {
   docNo: string
   interState: boolean
   validUntil?: string
+  topMm: number
 }
 
 export function DocumentView(props: DocViewProps) {
@@ -69,8 +71,9 @@ export function DocumentView(props: DocViewProps) {
         ? (doc as Bill).companyBillNo
         : (doc as Quotation).companyQuoteNo
   const validUntil = !isBill ? (doc as Quotation).validUntil : undefined
+  const topMm = (isBill ? settings.letterpadBillTopMm : settings.letterpadQuoteTopMm) ?? 40
 
-  const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil }
+  const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, topMm }
   const template: DocTemplate = company?.template ?? 'modern'
 
   return (
@@ -91,9 +94,10 @@ export function DocumentView(props: DocViewProps) {
 /* Shared bits                                                         */
 /* ------------------------------------------------------------------ */
 
-function LetterheadSpacer() {
-  // Clears the pre-printed header on letter-pad stationery.
-  return <div className="h-16 print:h-[32mm]" aria-hidden />
+function LetterheadSpacer({ mm }: { mm: number }) {
+  // Clears the pre-printed header on letter-pad stationery. Height is configurable
+  // in Settings so content starts below your letterhead.
+  return <div style={{ height: `${mm}mm` }} aria-hidden />
 }
 
 function StatusStamp({ status }: { status: string }) {
@@ -121,7 +125,7 @@ function AmountWords({ amount }: { amount: number }) {
 /* ------------------------------------------------------------------ */
 
 function ModernTemplate({ ctx }: { ctx: Ctx }) {
-  const { doc, company, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, showHeader, settings } = ctx
+  const { doc, company, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, showHeader, settings, topMm } = ctx
   return (
     <div className="p-8 print:p-0">
       {showHeader ? (
@@ -152,7 +156,7 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
           </div>
         </div>
       ) : (
-        <LetterheadSpacer />
+        <LetterheadSpacer mm={topMm} />
       )}
 
       {/* Meta + bill to */}
@@ -214,7 +218,7 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
 /* ------------------------------------------------------------------ */
 
 function ClassicTemplate({ ctx }: { ctx: Ctx }) {
-  const { doc, company, gst, accent, isBill, t, title, docNo, interState, validUntil, showHeader, settings } = ctx
+  const { doc, company, gst, accent, isBill, t, title, docNo, interState, validUntil, showHeader, settings, topMm } = ctx
   return (
     <div className="p-9 print:p-2">
       {showHeader ? (
@@ -237,7 +241,7 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
         </div>
       ) : (
         <>
-          <LetterheadSpacer />
+          <LetterheadSpacer mm={topMm} />
           <div className="mx-auto mb-2 flex items-center justify-center gap-3">
             <span className="h-px w-16" style={{ background: accent }} />
             <span className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-700">{title}</span>
@@ -307,7 +311,7 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
 /* ------------------------------------------------------------------ */
 
 function MinimalTemplate({ ctx }: { ctx: Ctx }) {
-  const { doc, company, gst, accent, isBill, t, title, docNo, validUntil, showHeader, settings } = ctx
+  const { doc, company, gst, accent, isBill, t, title, docNo, validUntil, showHeader, settings, topMm } = ctx
   return (
     <div className="border-l-[6px] p-8 print:p-2" style={{ borderColor: accent }}>
       {showHeader ? (
@@ -328,7 +332,7 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
         </div>
       ) : (
         <>
-          <LetterheadSpacer />
+          <LetterheadSpacer mm={topMm} />
           <div className="flex items-center justify-between">
             <p className="text-xs uppercase tracking-widest text-slate-400">{title}</p>
             <p className="text-sm font-bold text-slate-700">{docNo} · {formatDate(doc.date)}</p>
@@ -409,14 +413,18 @@ function TotalsBlock({ ctx, variant }: { ctx: Ctx; variant: 'card' | 'ruled' }) 
 }
 
 function Footer({ ctx }: { ctx: Ctx }) {
-  const { company } = ctx
+  const { company, isBill, t } = ctx
+  // Show a scannable pay-QR on bills that still owe money.
+  const showQr = isBill && !!company?.upiId && t.balance > 0.001
+  const qrAmount = t.balance > 0.001 ? t.balance : t.net
   return (
     <div className="mt-6 grid grid-cols-2 gap-6 border-t border-slate-200 pt-4 text-xs">
       <div className="space-y-2">
-        {company?.bankDetails && (
+        {(company?.bankDetails || company?.upiId) && (
           <div>
             <p className="font-semibold text-slate-600">Payment details</p>
-            <p className="text-slate-500">{company.bankDetails}</p>
+            {company?.bankDetails && <p className="text-slate-500">{company.bankDetails}</p>}
+            {company?.upiId && <p className="text-slate-500">UPI (GPay/PhonePe): {company.upiId}</p>}
           </div>
         )}
         <div>
@@ -424,9 +432,17 @@ function Footer({ ctx }: { ctx: Ctx }) {
           <p className="text-slate-500">{company?.terms || 'Thank you for your business.'}</p>
         </div>
       </div>
-      <div className="flex flex-col items-end justify-end text-right">
-        <p className="text-slate-500">For {company?.name}</p>
-        <div className="mt-10 border-t border-slate-300 pt-1 text-slate-500">Authorised Signatory</div>
+      <div className="flex items-end justify-end gap-4">
+        {showQr && (
+          <div className="text-center">
+            <UpiQr upiId={company!.upiId!} payeeName={company!.payeeName || company!.name} amount={qrAmount} note={ctx.docNo} size={92} className="rounded border border-slate-200" />
+            <p className="mt-0.5 text-[10px] text-slate-500">Scan to pay</p>
+          </div>
+        )}
+        <div className="text-right">
+          <p className="text-slate-500">For {company?.name}</p>
+          <div className="mt-10 border-t border-slate-300 pt-1 text-slate-500">Authorised Signatory</div>
+        </div>
       </div>
     </div>
   )

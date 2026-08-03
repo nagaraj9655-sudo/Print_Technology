@@ -321,6 +321,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         stateCode: c.stateCode || c.gstin?.slice(0, 2),
         logoDataUrl: c.logoDataUrl,
         bankDetails: c.bankDetails,
+        upiId: c.upiId?.trim() || undefined,
+        payeeName: c.payeeName,
         invoicePrefix: c.invoicePrefix,
         quotePrefix: c.quotePrefix,
         accent: c.accent || '#1f47f5',

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { BellRing, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { EmptyState, Modal, useConfirm, useToast } from '../components/ui'
+import { PaymentReminder, type ReminderTarget } from '../components/PaymentReminder'
 import { billTotals } from '../lib/calc'
 import { formatINR } from '../lib/format'
 import type { Customer } from '../lib/types'
@@ -10,6 +11,7 @@ export default function Customers() {
   const { db, saveCustomer, deleteCustomer, currentUser } = useStore()
   const toast = useToast()
   const { confirm, node } = useConfirm()
+  const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Customer | null>(null)
   const [open, setOpen] = useState(false)
@@ -88,6 +90,15 @@ export default function Customers() {
                       <td className={`td text-right tnum ${(s?.balance ?? 0) > 0 ? 'text-red-600' : 'text-slate-400'}`}>{formatINR(s?.balance ?? 0)}</td>
                       <td className="td">
                         <div className="flex justify-end gap-1">
+                          {(s?.balance ?? 0) > 0 && (
+                            <button
+                              className="rounded p-1.5 text-amber-500 hover:bg-amber-50"
+                              title="Send payment reminder"
+                              onClick={() => setReminderTarget({ customerId: c.id, customerName: c.name, customerPhone: c.phone })}
+                            >
+                              <BellRing className="h-4 w-4" />
+                            </button>
+                          )}
                           <button className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></button>
                           <button className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" onClick={() => onDelete(c)}><Trash2 className="h-4 w-4" /></button>
                         </div>

@@ -6,8 +6,8 @@ import { Lock, Mail } from 'lucide-react'
 export default function Login() {
   const { login, mode } = useStore()
   const toast = useToast()
-  const [email, setEmail] = useState(mode === 'supabase' ? '' : 'admin@magizhini.app')
-  const [password, setPassword] = useState(mode === 'supabase' ? '' : 'admin123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
   const [busy, setBusy] = useState(false)
@@ -67,20 +67,12 @@ export default function Login() {
           <button type="submit" className="btn-primary w-full" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
-          {mode === 'local' ? (
-            <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-              <p className="font-medium text-slate-600">Demo accounts</p>
-              <p>Admin — admin@magizhini.app / admin123</p>
-              <p>Operator — operator@magizhini.app / operator123</p>
-            </div>
-          ) : (
-            <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-              Sign in with your Supabase account. The first user to sign up becomes the Admin.
-            </p>
-          )}
+          <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500 text-center">
+            Sign in to access your dashboard
+          </p>
         </form>
         <p className="mt-4 text-center text-xs text-slate-400">
-          {mode === 'supabase' ? 'Connected to Supabase · secure cloud database' : 'Client-side mode · data stored locally in your browser'}
+          Secure Login
         </p>
       </div>
     </div>
