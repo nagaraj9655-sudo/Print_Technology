@@ -25,9 +25,10 @@ export interface Handbook {
   id: ID
   name: string // e.g. "Counter book" or the worker's name
   bookNo: string // book number printed on the cover
-  billsPerBook: number // how many receipts the book holds
+  billsPerBook: number // how many receipts the book holds (total receipts)
   startNo: number // first receipt number (usually 1)
   assignedTo?: string // worker this book belongs to
+  damagedReceipts?: number[] // spoiled/void receipt numbers to skip
 }
 
 export interface Company {

@@ -3,6 +3,7 @@ import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { EmptyState, Modal, useConfirm, useToast } from '../components/ui'
 import { uid } from '../lib/db'
+import { parseNumberList } from '../lib/handbooks'
 import type { Company, Handbook } from '../lib/types'
 
 export default function Companies() {
@@ -226,40 +227,14 @@ function CompanyModal({
           <p className="rounded-lg bg-slate-50 px-3 py-3 text-center text-xs text-slate-400">No books yet. Add one for each physical receipt book / worker.</p>
         ) : (
           <div className="space-y-2">
-            {(form.handbooks ?? []).map((hb) => {
-              const upd = (patch: Partial<Handbook>) =>
-                set({ handbooks: (form.handbooks ?? []).map((x) => (x.id === hb.id ? { ...x, ...patch } : x)) })
-              return (
-                <div key={hb.id} className="grid grid-cols-2 items-end gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-6">
-                  <div className="col-span-2 sm:col-span-2">
-                    <label className="label">Book name</label>
-                    <input className="input" value={hb.name} onChange={(e) => upd({ name: e.target.value })} placeholder="Counter / worker" />
-                  </div>
-                  <div>
-                    <label className="label">Book No</label>
-                    <input className="input" value={hb.bookNo} onChange={(e) => upd({ bookNo: e.target.value })} placeholder="12" />
-                  </div>
-                  <div>
-                    <label className="label"># Bills</label>
-                    <input type="number" min={1} className="input tnum" value={hb.billsPerBook} onChange={(e) => upd({ billsPerBook: parseInt(e.target.value) || 0 })} />
-                  </div>
-                  <div>
-                    <label className="label">Start No</label>
-                    <input type="number" min={0} className="input tnum" value={hb.startNo} onChange={(e) => upd({ startNo: parseInt(e.target.value) || 0 })} />
-                  </div>
-                  <div className="flex items-end gap-1">
-                    <div className="flex-1">
-                      <label className="label">Worker</label>
-                      <input className="input" value={hb.assignedTo ?? ''} onChange={(e) => upd({ assignedTo: e.target.value })} placeholder="Optional" />
-                    </div>
-                    <button type="button" className="mb-1 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
-                      onClick={() => set({ handbooks: (form.handbooks ?? []).filter((x) => x.id !== hb.id) })}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+            {(form.handbooks ?? []).map((hb) => (
+              <HandbookRow
+                key={hb.id}
+                book={hb}
+                onChange={(patch) => set({ handbooks: (form.handbooks ?? []).map((x) => (x.id === hb.id ? { ...x, ...patch } : x)) })}
+                onRemove={() => set({ handbooks: (form.handbooks ?? []).filter((x) => x.id !== hb.id) })}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -271,5 +246,57 @@ function CompanyModal({
         </button>
       </div>
     </Modal>
+  )
+}
+
+function HandbookRow({ book, onChange, onRemove }: { book: Handbook; onChange: (patch: Partial<Handbook>) => void; onRemove: () => void }) {
+  const [damagedText, setDamagedText] = useState((book.damagedReceipts ?? []).join(', '))
+  const start = book.startNo || 1
+  const end = start + (book.billsPerBook || 0) - 1
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-2">
+      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-6">
+        <div className="col-span-2">
+          <label className="label">Book name</label>
+          <input className="input" value={book.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Counter / worker" />
+        </div>
+        <div>
+          <label className="label">Book No</label>
+          <input className="input" value={book.bookNo} onChange={(e) => onChange({ bookNo: e.target.value })} placeholder="12" />
+        </div>
+        <div>
+          <label className="label">Total receipts</label>
+          <input type="number" min={1} className="input tnum" value={book.billsPerBook} onChange={(e) => onChange({ billsPerBook: parseInt(e.target.value) || 0 })} />
+        </div>
+        <div>
+          <label className="label">Start No</label>
+          <input type="number" min={0} className="input tnum" value={book.startNo} onChange={(e) => onChange({ startNo: parseInt(e.target.value) || 0 })} />
+        </div>
+        <div className="flex items-end gap-1">
+          <div className="flex-1">
+            <label className="label">Worker</label>
+            <input className="input" value={book.assignedTo ?? ''} onChange={(e) => onChange({ assignedTo: e.target.value })} placeholder="Optional" />
+          </div>
+          <button type="button" className="mb-1 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" onClick={onRemove} title="Remove book">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div>
+          <label className="label">Damaged / spoiled receipt nos</label>
+          <input
+            className="input"
+            value={damagedText}
+            onChange={(e) => { setDamagedText(e.target.value); onChange({ damagedReceipts: parseNumberList(e.target.value) }) }}
+            placeholder="e.g. 7, 12, 19"
+          />
+        </div>
+        <p className="flex items-end text-xs text-slate-400">
+          Receipts {book.billsPerBook ? `${start}–${end}` : '—'}. Damaged numbers are skipped automatically when issuing bills.
+        </p>
+      </div>
+    </div>
   )
 }

@@ -7,6 +7,7 @@ import { CustomerFields, type CustomerValue } from '../components/CustomerFields
 import { LineItemEditor } from '../components/LineItemEditor'
 import { useToast } from '../components/ui'
 import { computeTotals, costBasis, isGstCompany, recipientInterState } from '../lib/calc'
+import { handbookUsage } from '../lib/handbooks'
 import { formatINR, todayISO } from '../lib/format'
 import { nextBillNumbers } from '../lib/numbering'
 import type { BillType, LineItem } from '../lib/types'
@@ -59,6 +60,8 @@ export default function BillForm() {
   const companyIsGst = isGstCompany(company)
   const gstMode = companyIsGst && gstEnabled
   const handbooks = company?.handbooks ?? []
+  const selectedBook = handbooks.find((h) => h.id === handbookId)
+  const usage = useMemo(() => (selectedBook ? handbookUsage(selectedBook, db.bills) : null), [selectedBook, db.bills])
 
   const totals = useMemo(
     () =>
@@ -89,7 +92,8 @@ export default function BillForm() {
     const hb = handbooks.find((h) => h.id === hid)
     if (hb) {
       setHandBookNo(hb.bookNo)
-      if (!handBillNo) setHandBillNo(String(hb.startNo || 1))
+      const u = handbookUsage(hb, db.bills)
+      setHandBillNo(u.nextAvailable != null ? String(u.nextAvailable) : '')
     }
   }
 
@@ -249,6 +253,17 @@ export default function BillForm() {
                   <label className="label">Bill / Receipt No *</label>
                   <input className="input" value={handBillNo} onChange={(e) => setHandBillNo(e.target.value)} placeholder="e.g. 045" />
                 </div>
+                {usage && (
+                  <div className="sm:col-span-3 text-xs text-amber-700">
+                    {selectedBook?.name} · {usage.total - usage.remaining} of {usage.total} used ·{' '}
+                    {usage.full ? (
+                      <span className="font-semibold text-red-600">book full — start a new book</span>
+                    ) : (
+                      <>next available <span className="font-semibold">#{usage.nextAvailable}</span></>
+                    )}
+                    {usage.damaged.length > 0 && <> · damaged: {usage.damaged.join(', ')}</>}
+                  </div>
+                )}
               </div>
             )}
           </div>
