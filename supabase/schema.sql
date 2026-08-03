@@ -58,6 +58,8 @@ create table if not exists public.companies (
   state_code     text,
   logo_data_url  text,
   bank_details   text,
+  upi_id         text,
+  payee_name     text,
   invoice_prefix text,
   quote_prefix   text,
   accent         text,
@@ -70,6 +72,8 @@ create table if not exists public.companies (
   updated_at     timestamptz not null default now()
 );
 alter table public.companies add column if not exists handbooks jsonb not null default '[]'::jsonb;
+alter table public.companies add column if not exists upi_id text;
+alter table public.companies add column if not exists payee_name text;
 
 create table if not exists public.customers (
   id         uuid primary key default gen_random_uuid(),

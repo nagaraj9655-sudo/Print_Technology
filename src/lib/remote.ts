@@ -17,7 +17,8 @@ function companyToRow(c: Company) {
   return {
     id: c.id, name: c.name, address: c.address, phone: c.phone, email: c.email ?? null,
     gstin: c.gstin ?? null, state_code: c.stateCode ?? null, logo_data_url: c.logoDataUrl ?? null,
-    bank_details: c.bankDetails ?? null, invoice_prefix: c.invoicePrefix ?? null, quote_prefix: c.quotePrefix ?? null,
+    bank_details: c.bankDetails ?? null, upi_id: c.upiId ?? null, payee_name: c.payeeName ?? null,
+    invoice_prefix: c.invoicePrefix ?? null, quote_prefix: c.quotePrefix ?? null,
     accent: c.accent ?? null, accent2: c.accent2 ?? null, template: c.template ?? null,
     font_family: c.fontFamily ?? null, terms: c.terms ?? null, handbooks: c.handbooks ?? [], is_active: c.isActive, updated_at: new Date().toISOString(),
   }
@@ -26,7 +27,8 @@ function rowToCompany(r: any): Company {
   return {
     id: r.id, name: r.name, address: r.address ?? '', phone: r.phone ?? '', email: r.email ?? undefined,
     gstin: r.gstin ?? undefined, stateCode: r.state_code ?? undefined, logoDataUrl: r.logo_data_url ?? undefined,
-    bankDetails: r.bank_details ?? undefined, invoicePrefix: r.invoice_prefix ?? undefined, quotePrefix: r.quote_prefix ?? undefined,
+    bankDetails: r.bank_details ?? undefined, upiId: r.upi_id ?? undefined, payeeName: r.payee_name ?? undefined,
+    invoicePrefix: r.invoice_prefix ?? undefined, quotePrefix: r.quote_prefix ?? undefined,
     accent: r.accent ?? undefined, accent2: r.accent2 ?? undefined, template: r.template ?? undefined,
     fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, handbooks: r.handbooks ?? [], isActive: r.is_active ?? true,
   }
