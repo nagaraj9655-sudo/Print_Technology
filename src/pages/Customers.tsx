@@ -125,6 +125,7 @@ export default function Customers() {
         />
       )}
       {node}
+      <PaymentReminder open={!!reminderTarget} onClose={() => setReminderTarget(null)} target={reminderTarget} />
     </div>
   )
 }
