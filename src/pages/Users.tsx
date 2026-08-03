@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { KeyRound, Pencil, Plus, ShieldCheck, Trash2, UserCog } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { EmptyState, Modal, useConfirm, useToast } from '../components/ui'
+import { OPERATOR_MENUS, ALL_OPERATOR_MENU_KEYS } from '../lib/menus'
 import type { Role, User } from '../lib/types'
 
 export default function Users() {
@@ -112,7 +113,11 @@ function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () =
   const [email, setEmail] = useState(user?.email ?? '')
   const [role, setRole] = useState<Role>(user?.role ?? 'Operator')
   const [password, setPassword] = useState('')
+  const [allowedMenus, setAllowedMenus] = useState<string[]>(user?.allowedMenus ?? ALL_OPERATOR_MENU_KEYS)
   const emailLocked = mode === 'supabase' && !!user // email is the Supabase login id; don't change it here
+
+  const toggleMenu = (key: string) =>
+    setAllowedMenus((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))
 
   return (
     <Modal open onClose={onClose} title={user ? 'Edit user' : 'Add user'}>
@@ -142,6 +147,22 @@ function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () =
           </div>
         )}
       </div>
+
+      {role === 'Operator' && (
+        <div className="mt-4">
+          <label className="label">Menus this operator can access</label>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-3">
+            {OPERATOR_MENUS.map((m) => (
+              <label key={m.key} className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={allowedMenus.includes(m.key)} onChange={() => toggleMenu(m.key)} />
+                {m.label}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-400">Admins always see everything. Unticked menus are hidden for this worker.</p>
+        </div>
+      )}
+
       <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
         {mode === 'supabase'
           ? user
@@ -151,7 +172,7 @@ function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () =
       </p>
       <div className="mt-5 flex justify-end gap-2">
         <button className="btn-outline" onClick={onClose}>Cancel</button>
-        <button className="btn-primary" disabled={!name.trim() || !email.trim() || (!user && !password.trim())} onClick={() => onSave({ id: user?.id, name, email, role, password })}>
+        <button className="btn-primary" disabled={!name.trim() || !email.trim() || (!user && !password.trim())} onClick={() => onSave({ id: user?.id, name, email, role, password, allowedMenus: role === 'Operator' ? allowedMenus : undefined })}>
           {user ? 'Save' : 'Create user'}
         </button>
       </div>

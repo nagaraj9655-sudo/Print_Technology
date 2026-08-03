@@ -17,16 +17,17 @@ import {
 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { formatINR } from '../lib/format'
+import { canAccess } from '../lib/menus'
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/bills', label: 'Bills', icon: Receipt },
-  { to: '/quotations', label: 'Quotations', icon: FileText },
-  { to: '/customers', label: 'Customers', icon: Users },
-  { to: '/reports', label: 'Reports', icon: PieChart },
-  { to: '/companies', label: 'Companies', icon: Building2 },
-  { to: '/users', label: 'Users', icon: UserCog, adminOnly: true },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'bills', to: '/bills', label: 'Bills', icon: Receipt },
+  { key: 'quotations', to: '/quotations', label: 'Quotations', icon: FileText },
+  { key: 'customers', to: '/customers', label: 'Customers', icon: Users },
+  { key: 'reports', to: '/reports', label: 'Reports', icon: PieChart },
+  { key: 'companies', to: '/companies', label: 'Companies', icon: Building2 },
+  { key: 'users', to: '/users', label: 'Users', icon: UserCog, adminOnly: true },
+  { key: 'settings', to: '/settings', label: 'Settings', icon: SettingsIcon, adminOnly: true },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -52,7 +53,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex flex-col gap-0.5 p-3">
-          {NAV.filter((item) => !item.adminOnly || currentUser?.role === 'Admin').map((item) => {
+          {NAV.filter((item) =>
+            item.adminOnly
+              ? currentUser?.role === 'Admin'
+              : canAccess(currentUser?.role ?? 'Operator', currentUser?.allowedMenus, item.key),
+          ).map((item) => {
             const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
             return (
               <Link

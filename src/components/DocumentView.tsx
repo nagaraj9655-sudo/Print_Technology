@@ -1,5 +1,5 @@
 import type { Bill, Company, DocTemplate, Quotation, Settings } from '../lib/types'
-import { billTotals, isGstCompany, lineTotal, quoteTotals, recipientInterState, type Totals } from '../lib/calc'
+import { billTotals, docUsesGst, lineTotal, quoteTotals, recipientInterState, type Totals } from '../lib/calc'
 import { amountInWords, formatDate, formatINR } from '../lib/format'
 
 // A4 print-ready invoice / quotation (§7) with per-company templates.
@@ -54,14 +54,20 @@ interface Ctx {
 
 export function DocumentView(props: DocViewProps) {
   const { doc, company, kind, settings, showHeader = true } = props
-  const gst = isGstCompany(company)
+  const gst = docUsesGst(company, doc.gstEnabled)
   const accent = company?.accent ?? '#2563eb'
   const accent2 = company?.accent2 ?? accent
   const isBill = kind === 'bill'
+  const bill = isBill ? (doc as Bill) : undefined
   const t = isBill ? billTotals(doc as Bill, company) : quoteTotals(doc as Quotation, company)
   const interState = recipientInterState(company, doc.customerGstin)
   const title = isBill ? (gst ? 'TAX INVOICE' : 'INVOICE') : 'QUOTATION'
-  const docNo = isBill ? (doc as Bill).companyBillNo : (doc as Quotation).companyQuoteNo
+  const docNo =
+    bill && bill.billType === 'Handbill'
+      ? `Book ${bill.handBookNo || '—'} · No ${bill.handBillNo || '—'}`
+      : isBill
+        ? (doc as Bill).companyBillNo
+        : (doc as Quotation).companyQuoteNo
   const validUntil = !isBill ? (doc as Quotation).validUntil : undefined
 
   const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil }

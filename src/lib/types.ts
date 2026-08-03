@@ -15,6 +15,19 @@ export interface User {
   role: Role
   // NOTE: client-side demo auth only. A real deployment hashes passwords server-side.
   password: string
+  // Menu keys an Operator may access (undefined = full access). Admins ignore this.
+  allowedMenus?: string[]
+}
+
+// A physical manual bill book: pre-printed, serially numbered receipts a worker
+// carries. Bills issued from it are recorded as "Handbill" bills.
+export interface Handbook {
+  id: ID
+  name: string // e.g. "Counter book" or the worker's name
+  bookNo: string // book number printed on the cover
+  billsPerBook: number // how many receipts the book holds
+  startNo: number // first receipt number (usually 1)
+  assignedTo?: string // worker this book belongs to
 }
 
 export interface Company {
@@ -34,6 +47,7 @@ export interface Company {
   template?: DocTemplate // document layout style (§ per-company design)
   fontFamily?: string // document font, e.g. 'Poppins', 'Libre Baskerville'
   terms?: string // invoice terms & footer
+  handbooks?: Handbook[] // manual bill books configured for this company
   isActive: boolean
 }
 
@@ -52,11 +66,14 @@ export interface LineItem {
   id: ID
   description: string // Service_Description
   qty: number // Qty
-  rate: number // Per_Rate
+  rate: number // Per_Rate (selling rate, printed)
+  cost?: number // Original/cost price per unit — NEVER printed; profit report only
   hsnSac?: string // hsn_sac (GST only)
   taxRate?: number // per-line GST % (GST only)
   // total is always derived: qty * rate
 }
+
+export type BillType = 'Online' | 'Handbill'
 
 export type PaymentStatus = 'Paid' | 'Partial' | 'Pending'
 
@@ -85,6 +102,12 @@ export interface Bill {
   items: LineItem[]
   discountAmount: number // Discount_Amount
   discountIsPercent?: boolean
+  gstEnabled?: boolean // per-document GST switch (only applies if company is GST-registered)
+  originalCost?: number // whole-document manual cost — NEVER printed; profit report only
+  billType?: BillType // Online (system-numbered) | Handbill (manual paper book)
+  handbookId?: ID // which manual book (Handbill)
+  handBookNo?: string // editable book number on the receipt (Handbill)
+  handBillNo?: string // editable receipt/bill number within the book (Handbill)
   receivedAmount: number // Received_Amount (kept in sync with payments)
   payments: Payment[]
   docStatus: DocStatus // Draft locks number only when Finalized
@@ -112,6 +135,8 @@ export interface Quotation {
   items: LineItem[]
   discountAmount: number
   discountIsPercent?: boolean
+  gstEnabled?: boolean // per-document GST switch (only applies if company is GST-registered)
+  originalCost?: number // whole-document manual cost — NEVER printed; profit report only
   status: QuoteStatus
   validUntil?: string
   convertedBillId?: ID

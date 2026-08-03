@@ -5,7 +5,7 @@
 import type { Database } from './types'
 import { PRINT_TECHNOLOGY_LOGO, SHRAVAN_INFOTECH_LOGO } from './logos'
 
-const STORAGE_KEY = 'magizhini.db.v3'
+const STORAGE_KEY = 'magizhini.db.v4'
 
 export function uid(): string {
   return crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2, 11)
@@ -61,6 +61,10 @@ export function seedDatabase(): Database {
         template: 'modern',
         fontFamily: 'Poppins',
         terms: 'Payment due within 15 days. Goods once sold will not be taken back.',
+        handbooks: [
+          { id: uid(), name: 'Counter Book', bookNo: '1', billsPerBook: 50, startNo: 1, assignedTo: 'Front desk' },
+          { id: uid(), name: 'Field Book', bookNo: '2', billsPerBook: 50, startNo: 1, assignedTo: 'Ravi (delivery)' },
+        ],
         isActive: true,
       },
       {

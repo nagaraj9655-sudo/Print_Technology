@@ -32,6 +32,7 @@ interface ComputeInput {
   receivedAmount?: number
   company: Company | undefined
   interState?: boolean // true => IGST, false => CGST+SGST
+  gstEnabled?: boolean // per-document switch; undefined = follow company (backward compat)
 }
 
 export function computeTotals(input: ComputeInput): Totals {
@@ -42,7 +43,7 @@ export function computeTotals(input: ComputeInput): Totals {
   )
   const taxable = round2(Math.max(0, gross - discount))
 
-  const gstMode = isGstCompany(input.company)
+  const gstMode = docUsesGst(input.company, input.gstEnabled)
   let tax = 0
   let cgst = 0
   let sgst = 0
@@ -82,6 +83,20 @@ export function isGstCompany(company: Company | undefined): boolean {
   return !!company?.gstin && company.gstin.trim().length > 0
 }
 
+// Whether a specific document should carry GST: the company must be GST-registered
+// AND the document's GST switch must be on. `gstEnabled === undefined` means follow
+// the company (keeps older records that predate the per-document switch working).
+export function docUsesGst(company: Company | undefined, gstEnabled?: boolean): boolean {
+  if (!isGstCompany(company)) return false
+  return gstEnabled ?? true
+}
+
+// Cost basis for the profit report: a whole-document cost overrides per-line costs.
+export function costBasis(items: LineItem[], originalCost?: number): number {
+  if (originalCost && originalCost > 0) return round2(originalCost)
+  return round2(items.reduce((s, it) => s + (it.cost || 0) * (it.qty || 0), 0))
+}
+
 export function billTotals(bill: Bill, company: Company | undefined): Totals {
   return computeTotals({
     items: bill.items,
@@ -90,6 +105,7 @@ export function billTotals(bill: Bill, company: Company | undefined): Totals {
     receivedAmount: bill.receivedAmount,
     company,
     interState: recipientInterState(company, bill.customerGstin),
+    gstEnabled: bill.gstEnabled,
   })
 }
 
@@ -101,6 +117,7 @@ export function quoteTotals(quote: Quotation, company: Company | undefined): Tot
     receivedAmount: 0,
     company,
     interState: recipientInterState(company, quote.customerGstin),
+    gstEnabled: quote.gstEnabled,
   })
 }
 

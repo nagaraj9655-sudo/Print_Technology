@@ -5,7 +5,7 @@ import { useStore, type QuoteDraft } from '../lib/store'
 import { CustomerFields, type CustomerValue } from '../components/CustomerFields'
 import { LineItemEditor } from '../components/LineItemEditor'
 import { useToast } from '../components/ui'
-import { computeTotals, isGstCompany, recipientInterState } from '../lib/calc'
+import { computeTotals, costBasis, isGstCompany, recipientInterState } from '../lib/calc'
 import { formatINR, todayISO } from '../lib/format'
 import { nextQuoteNumbers } from '../lib/numbering'
 import type { LineItem, QuoteStatus } from '../lib/types'
@@ -39,14 +39,21 @@ export default function QuoteForm() {
   )
   const [discountAmount, setDiscountAmount] = useState(existing?.discountAmount ?? 0)
   const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
+  const [gstEnabled, setGstEnabled] = useState(existing?.gstEnabled ?? true)
+  const [showLineCost, setShowLineCost] = useState(existing?.items.some((i) => i.cost != null) ?? false)
+  const [originalCost, setOriginalCost] = useState(existing?.originalCost ?? 0)
 
   const company = db.companies.find((c) => c.id === companyId)
-  const gstMode = isGstCompany(company)
+  const companyIsGst = isGstCompany(company)
+  const gstMode = companyIsGst && gstEnabled
 
   const totals = useMemo(
-    () => computeTotals({ items, discountAmount, discountIsPercent, company, interState: recipientInterState(company, customer.customerGstin) }),
-    [items, discountAmount, discountIsPercent, company, customer.customerGstin],
+    () => computeTotals({ items, discountAmount, discountIsPercent, company, interState: recipientInterState(company, customer.customerGstin), gstEnabled }),
+    [items, discountAmount, discountIsPercent, company, customer.customerGstin, gstEnabled],
   )
+
+  const cost = costBasis(items, originalCost)
+  const profit = totals.taxable - cost
 
   const previewNumber = useMemo(
     () => (existing ? existing.companyQuoteNo : nextQuoteNumbers(db, companyId, date).companyQuoteNo),
@@ -70,6 +77,8 @@ export default function QuoteForm() {
       discountIsPercent,
       validUntil: validUntil || undefined,
       status: statusVal,
+      gstEnabled: companyIsGst ? gstEnabled : false,
+      originalCost: originalCost || undefined,
     }
     const saved = existing ? updateQuote(existing.id, draft) : createQuote(draft)
     toast('Quotation saved')
@@ -118,6 +127,23 @@ export default function QuoteForm() {
                 <input className="input bg-slate-50 font-medium" value={previewNumber} readOnly />
               </div>
             </div>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <label className="label">Tax</label>
+              {companyIsGst ? (
+                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-sm">
+                  <button type="button" onClick={() => setGstEnabled(true)}
+                    className={`rounded-md px-3 py-1.5 font-medium ${gstEnabled ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+                    With GST
+                  </button>
+                  <button type="button" onClick={() => setGstEnabled(false)}
+                    className={`rounded-md px-3 py-1.5 font-medium ${!gstEnabled ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+                    Without GST
+                  </button>
+                </div>
+              ) : (
+                <p className="rounded-lg bg-slate-50 px-3 py-1.5 text-sm text-slate-500">Non-GST company — no tax on this quote</p>
+              )}
+            </div>
           </div>
 
           <div className="card p-5">
@@ -126,8 +152,14 @@ export default function QuoteForm() {
           </div>
 
           <div className="card p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-700">Line items</h3>
-            <LineItemEditor items={items} onChange={setItems} gstMode={gstMode} taxRates={db.settings.taxRates} defaultTaxRate={db.settings.defaultTaxRate} />
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-700">Line items</h3>
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                <input type="checkbox" checked={showLineCost} onChange={(e) => setShowLineCost(e.target.checked)} />
+                Track per-item cost (profit)
+              </label>
+            </div>
+            <LineItemEditor items={items} onChange={setItems} gstMode={gstMode} taxRates={db.settings.taxRates} defaultTaxRate={db.settings.defaultTaxRate} showCost={showLineCost} />
           </div>
         </div>
 
@@ -153,6 +185,24 @@ export default function QuoteForm() {
             <button className="btn-primary mt-5 w-full" onClick={submit}>
               <CheckCircle2 className="h-4 w-4" /> Save quotation
             </button>
+          </div>
+
+          <div className="card mt-5 border-amber-200 p-5">
+            <h3 className="mb-1 text-sm font-semibold text-slate-700">Profit (internal)</h3>
+            <p className="mb-3 text-xs text-slate-400">Original cost is never printed on the quotation.</p>
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="label">Total original cost (optional)</label>
+                <input type="number" min={0} step="any" className="input text-right tnum" placeholder="0.00"
+                  value={originalCost || ''} onChange={(e) => setOriginalCost(parseFloat(e.target.value) || 0)} />
+                <p className="mt-1 text-xs text-slate-400">Overrides per-item costs if set.</p>
+              </div>
+              <div className="flex justify-between"><span className="text-slate-400">Cost basis</span><span className="tnum text-slate-500">{formatINR(cost)}</span></div>
+              <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                <span className="font-medium text-slate-600">Profit</span>
+                <span className={`font-bold tnum ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatINR(profit)}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

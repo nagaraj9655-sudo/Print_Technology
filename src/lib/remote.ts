@@ -19,7 +19,7 @@ function companyToRow(c: Company) {
     gstin: c.gstin ?? null, state_code: c.stateCode ?? null, logo_data_url: c.logoDataUrl ?? null,
     bank_details: c.bankDetails ?? null, invoice_prefix: c.invoicePrefix ?? null, quote_prefix: c.quotePrefix ?? null,
     accent: c.accent ?? null, accent2: c.accent2 ?? null, template: c.template ?? null,
-    font_family: c.fontFamily ?? null, terms: c.terms ?? null, is_active: c.isActive, updated_at: new Date().toISOString(),
+    font_family: c.fontFamily ?? null, terms: c.terms ?? null, handbooks: c.handbooks ?? [], is_active: c.isActive, updated_at: new Date().toISOString(),
   }
 }
 function rowToCompany(r: any): Company {
@@ -28,7 +28,7 @@ function rowToCompany(r: any): Company {
     gstin: r.gstin ?? undefined, stateCode: r.state_code ?? undefined, logoDataUrl: r.logo_data_url ?? undefined,
     bankDetails: r.bank_details ?? undefined, invoicePrefix: r.invoice_prefix ?? undefined, quotePrefix: r.quote_prefix ?? undefined,
     accent: r.accent ?? undefined, accent2: r.accent2 ?? undefined, template: r.template ?? undefined,
-    fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, isActive: r.is_active ?? true,
+    fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, handbooks: r.handbooks ?? [], isActive: r.is_active ?? true,
   }
 }
 
@@ -45,6 +45,8 @@ function billToRow(b: Bill) {
     customer_type: b.customerType, customer_id: b.customerId ?? null, customer_name: b.customerName,
     customer_address: b.customerAddress, customer_phone: b.customerPhone, customer_gstin: b.customerGstin ?? null,
     items: b.items, discount_amount: b.discountAmount, discount_is_percent: b.discountIsPercent ?? false,
+    gst_enabled: b.gstEnabled ?? null, original_cost: b.originalCost ?? null, bill_type: b.billType ?? 'Online',
+    handbook_id: b.handbookId ?? null, hand_book_no: b.handBookNo ?? null, hand_bill_no: b.handBillNo ?? null,
     received_amount: b.receivedAmount, payments: b.payments, doc_status: b.docStatus,
     created_by: b.createdBy, created_at: b.createdAt, updated_at: b.updatedAt, deleted_at: b.deletedAt ?? null,
   }
@@ -55,6 +57,8 @@ function rowToBill(r: any): Bill {
     customerType: r.customer_type, customerId: r.customer_id ?? undefined, customerName: r.customer_name ?? '',
     customerAddress: r.customer_address ?? '', customerPhone: r.customer_phone ?? '', customerGstin: r.customer_gstin ?? undefined,
     items: r.items ?? [], discountAmount: Number(r.discount_amount) || 0, discountIsPercent: r.discount_is_percent ?? false,
+    gstEnabled: r.gst_enabled ?? undefined, originalCost: r.original_cost ?? undefined, billType: r.bill_type ?? 'Online',
+    handbookId: r.handbook_id ?? undefined, handBookNo: r.hand_book_no ?? undefined, handBillNo: r.hand_bill_no ?? undefined,
     receivedAmount: Number(r.received_amount) || 0, payments: r.payments ?? [], docStatus: r.doc_status,
     createdBy: r.created_by ?? '', createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at ?? undefined,
   }
@@ -66,6 +70,7 @@ function quoteToRow(q: Quotation) {
     customer_type: q.customerType, customer_id: q.customerId ?? null, customer_name: q.customerName,
     customer_address: q.customerAddress, customer_phone: q.customerPhone, customer_gstin: q.customerGstin ?? null,
     items: q.items, discount_amount: q.discountAmount, discount_is_percent: q.discountIsPercent ?? false,
+    gst_enabled: q.gstEnabled ?? null, original_cost: q.originalCost ?? null,
     status: q.status, valid_until: q.validUntil ?? null, converted_bill_id: q.convertedBillId ?? null,
     created_by: q.createdBy, created_at: q.createdAt, updated_at: q.updatedAt, deleted_at: q.deletedAt ?? null,
   }
@@ -76,6 +81,7 @@ function rowToQuote(r: any): Quotation {
     customerType: r.customer_type, customerId: r.customer_id ?? undefined, customerName: r.customer_name ?? '',
     customerAddress: r.customer_address ?? '', customerPhone: r.customer_phone ?? '', customerGstin: r.customer_gstin ?? undefined,
     items: r.items ?? [], discountAmount: Number(r.discount_amount) || 0, discountIsPercent: r.discount_is_percent ?? false,
+    gstEnabled: r.gst_enabled ?? undefined, originalCost: r.original_cost ?? undefined,
     status: r.status, validUntil: r.valid_until ?? undefined, convertedBillId: r.converted_bill_id ?? undefined,
     createdBy: r.created_by ?? '', createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at ?? undefined,
   }
@@ -86,11 +92,14 @@ function rowToQuote(r: any): Quotation {
 export async function fetchUsers(): Promise<User[]> {
   const { data, error } = await db().from('profiles').select('*').order('created_at')
   if (error) throw error
-  return (data ?? []).map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, password: '' }))
+  return (data ?? []).map((r) => ({
+    id: r.id, name: r.name, email: r.email, role: r.role, password: '',
+    allowedMenus: r.allowed_menus ?? undefined,
+  }))
 }
 
-export async function updateProfileRole(id: string, role: User['role'], name: string): Promise<void> {
-  const { error } = await db().from('profiles').update({ role, name }).eq('id', id)
+export async function updateProfileRole(id: string, role: User['role'], name: string, allowedMenus?: string[]): Promise<void> {
+  const { error } = await db().from('profiles').update({ role, name, allowed_menus: allowedMenus ?? null }).eq('id', id)
   if (error) throw error
 }
 

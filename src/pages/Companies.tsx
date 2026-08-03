@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { EmptyState, Modal, useConfirm, useToast } from '../components/ui'
-import type { Company } from '../lib/types'
+import { uid } from '../lib/db'
+import type { Company, Handbook } from '../lib/types'
 
 export default function Companies() {
   const { db, saveCompany, deleteCompany, currentUser } = useStore()
@@ -205,6 +206,64 @@ function CompanyModal({
           {form.logoDataUrl && <img src={form.logoDataUrl} alt="" className="mt-2 h-12 rounded object-contain" />}
         </div>
       </div>
+
+      {/* Manual bill books (handbills) */}
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <div className="mb-2 flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-700">Manual bill books (Handbills)</h4>
+            <p className="text-xs text-slate-400">Pre-printed receipt books your workers carry. Configure them here; numbers stay editable when issuing a bill.</p>
+          </div>
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => set({ handbooks: [...(form.handbooks ?? []), { id: uid(), name: '', bookNo: '', billsPerBook: 50, startNo: 1 } as Handbook] })}
+          >
+            <Plus className="h-4 w-4" /> Add book
+          </button>
+        </div>
+        {(form.handbooks ?? []).length === 0 ? (
+          <p className="rounded-lg bg-slate-50 px-3 py-3 text-center text-xs text-slate-400">No books yet. Add one for each physical receipt book / worker.</p>
+        ) : (
+          <div className="space-y-2">
+            {(form.handbooks ?? []).map((hb) => {
+              const upd = (patch: Partial<Handbook>) =>
+                set({ handbooks: (form.handbooks ?? []).map((x) => (x.id === hb.id ? { ...x, ...patch } : x)) })
+              return (
+                <div key={hb.id} className="grid grid-cols-2 items-end gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-6">
+                  <div className="col-span-2 sm:col-span-2">
+                    <label className="label">Book name</label>
+                    <input className="input" value={hb.name} onChange={(e) => upd({ name: e.target.value })} placeholder="Counter / worker" />
+                  </div>
+                  <div>
+                    <label className="label">Book No</label>
+                    <input className="input" value={hb.bookNo} onChange={(e) => upd({ bookNo: e.target.value })} placeholder="12" />
+                  </div>
+                  <div>
+                    <label className="label"># Bills</label>
+                    <input type="number" min={1} className="input tnum" value={hb.billsPerBook} onChange={(e) => upd({ billsPerBook: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div>
+                    <label className="label">Start No</label>
+                    <input type="number" min={0} className="input tnum" value={hb.startNo} onChange={(e) => upd({ startNo: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div className="flex items-end gap-1">
+                    <div className="flex-1">
+                      <label className="label">Worker</label>
+                      <input className="input" value={hb.assignedTo ?? ''} onChange={(e) => upd({ assignedTo: e.target.value })} placeholder="Optional" />
+                    </div>
+                    <button type="button" className="mb-1 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                      onClick={() => set({ handbooks: (form.handbooks ?? []).filter((x) => x.id !== hb.id) })}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="mt-5 flex justify-end gap-2">
         <button className="btn-outline" onClick={onClose}>Cancel</button>
         <button className="btn-primary" disabled={!form.name?.trim()} onClick={() => onSave({ ...form, id: company?.id })}>

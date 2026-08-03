@@ -81,6 +81,12 @@ export interface BillDraft {
   discountAmount: number
   discountIsPercent?: boolean
   receivedAmount: number
+  gstEnabled?: boolean
+  originalCost?: number
+  billType?: Bill['billType']
+  handbookId?: string
+  handBookNo?: string
+  handBillNo?: string
 }
 
 export interface QuoteDraft {
@@ -97,6 +103,8 @@ export interface QuoteDraft {
   discountIsPercent?: boolean
   validUntil?: string
   status: Quotation['status']
+  gstEnabled?: boolean
+  originalCost?: number
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -239,7 +247,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (mode === 'supabase') {
         try {
           if (u.id) {
-            await remote.updateProfileRole(u.id, u.role ?? 'Operator', u.name.trim())
+            await remote.updateProfileRole(u.id, u.role ?? 'Operator', u.name.trim(), u.allowedMenus)
           } else {
             await remote.adminCreateUser({ name: u.name.trim(), email, password: u.password!.trim(), role: u.role ?? 'Operator' })
           }
@@ -262,9 +270,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             role: u.role ?? d.users[idx].role,
             // keep existing password when the field is left blank on edit
             password: u.password?.trim() ? u.password : d.users[idx].password,
+            allowedMenus: u.allowedMenus,
           }
         } else {
-          d.users.push({ id: uid(), name: u.name!.trim(), email, role: u.role ?? 'Operator', password: u.password!.trim() })
+          d.users.push({ id: uid(), name: u.name!.trim(), email, role: u.role ?? 'Operator', password: u.password!.trim(), allowedMenus: u.allowedMenus })
         }
       })
       return { ok: true }
@@ -319,6 +328,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         template: c.template ?? 'modern',
         fontFamily: c.fontFamily ?? 'Inter',
         terms: c.terms,
+        handbooks: c.handbooks ?? [],
         isActive: c.isActive ?? true,
       }
       mutate((d) => {
@@ -385,6 +395,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     items: draft.items,
     discountAmount: draft.discountAmount || 0,
     discountIsPercent: draft.discountIsPercent,
+    gstEnabled: draft.gstEnabled,
+    originalCost: draft.originalCost,
+    billType: draft.billType ?? 'Online',
+    handbookId: draft.handbookId,
+    handBookNo: draft.handBookNo,
+    handBillNo: draft.handBillNo,
     receivedAmount: draft.receivedAmount || 0,
     payments:
       draft.receivedAmount > 0
@@ -395,13 +411,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     updatedAt: new Date().toISOString(),
   })
 
+  // Assign numbers on finalize. Handbill bills carry the manual book/receipt ref as
+  // their company number and don't consume the auto per-company series.
+  const assignBillNumbers = (d: Database, draft: BillDraft) => {
+    if (draft.billType === 'Handbill') {
+      return {
+        billNo: (d.counters.billNo = (d.counters.billNo || 0) + 1),
+        companyBillNo: `${draft.handBookNo || '?'}/${draft.handBillNo || '?'}`,
+      }
+    }
+    return commitBillNumbers(d, draft.companyId, draft.date)
+  }
+
   const createBill: StoreValue['createBill'] = useCallback(
     (draft, finalize) => {
       let created!: Bill
       mutate((d) => {
         const base = buildBillBase(draft)
         const nums = finalize
-          ? commitBillNumbers(d, draft.companyId, draft.date)
+          ? assignBillNumbers(d, draft)
           : { billNo: 0, companyBillNo: 'DRAFT' }
         created = {
           ...base,
@@ -430,9 +458,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         let billNo = prev.billNo
         let companyBillNo = prev.companyBillNo
         if (finalize && prev.docStatus === 'Draft') {
-          const nums = commitBillNumbers(d, draft.companyId, draft.date)
+          const nums = assignBillNumbers(d, draft)
           billNo = nums.billNo
           companyBillNo = nums.companyBillNo
+        } else if (draft.billType === 'Handbill' && prev.docStatus === 'Finalized') {
+          // Handbill book/receipt numbers stay editable after finalize.
+          companyBillNo = `${draft.handBookNo || '?'}/${draft.handBillNo || '?'}`
         }
         updated = {
           ...prev,
@@ -530,6 +561,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           items: draft.items,
           discountAmount: draft.discountAmount || 0,
           discountIsPercent: draft.discountIsPercent,
+          gstEnabled: draft.gstEnabled,
+          originalCost: draft.originalCost,
           status: draft.status,
           validUntil: draft.validUntil,
           createdBy: currentUser?.name ?? 'system',
@@ -563,6 +596,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           items: draft.items,
           discountAmount: draft.discountAmount || 0,
           discountIsPercent: draft.discountIsPercent,
+          gstEnabled: draft.gstEnabled,
+          originalCost: draft.originalCost,
           status: draft.status,
           validUntil: draft.validUntil,
           updatedAt: new Date().toISOString(),
@@ -612,6 +647,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           items: q.items.map((it) => ({ ...it, id: uid() })),
           discountAmount: q.discountAmount,
           discountIsPercent: q.discountIsPercent,
+          gstEnabled: q.gstEnabled,
+          originalCost: q.originalCost,
+          billType: 'Online',
           receivedAmount: 0,
           payments: [],
           docStatus: 'Finalized',

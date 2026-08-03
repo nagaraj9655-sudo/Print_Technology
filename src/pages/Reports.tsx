@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
 import { useStore, useScopedBills, useScopedQuotes } from '../lib/store'
-import { billTotals, quoteTotals } from '../lib/calc'
+import { billTotals, costBasis, quoteTotals } from '../lib/calc'
 import { daysBetween, formatDate, formatINR } from '../lib/format'
 import { exportBillRegister, exportGenericSheet, exportQuoteRegister } from '../lib/excel'
 import type { Bill } from '../lib/types'
 
-type Tab = 'sales' | 'receivables' | 'payments' | 'quotes' | 'statement' | 'company' | 'gst'
+type Tab = 'sales' | 'receivables' | 'payments' | 'profit' | 'quotes' | 'statement' | 'company' | 'gst'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'sales', label: 'Sales Register' },
   { key: 'receivables', label: 'Receivables' },
   { key: 'payments', label: 'Payments' },
+  { key: 'profit', label: 'Profit / Margin' },
   { key: 'quotes', label: 'Quotations' },
   { key: 'statement', label: 'Customer Statement' },
   { key: 'company', label: 'Company Summary' },
@@ -81,6 +82,7 @@ export default function Reports() {
       {tab === 'sales' && <SalesRegister bills={finalized} db={db} companyName={companyName} onExport={() => exportBillRegister(finalized, db.companies, { title: 'Sales Register', filterSummary })} />}
       {tab === 'receivables' && <Receivables bills={finalized} companyName={companyName} db={db} filterSummary={filterSummary} />}
       {tab === 'payments' && <Payments bills={finalized} companyName={companyName} filterSummary={filterSummary} />}
+      {tab === 'profit' && <ProfitReport bills={finalized} companyName={companyName} db={db} />}
       {tab === 'quotes' && (
         <QuotesReport
           quotes={quotes.filter((q) => inRange(q.date))}
@@ -203,6 +205,62 @@ function Payments({ bills, companyName, filterSummary }: { bills: Bill[]; compan
         <tfoot><tr className="bg-slate-50 font-semibold"><td className="td" colSpan={4}>Total received</td><td className="td text-right tnum text-emerald-600">{formatINR(total)}</td></tr></tfoot>
       </table>
     </ReportShell>
+  )
+}
+
+function ProfitReport({ bills, companyName, db }: { bills: Bill[]; companyName: (id: string) => string; db: ReturnType<typeof useStore>['db'] }) {
+  // Only bills where a cost was entered contribute to profit.
+  const rows = bills
+    .map((b) => {
+      const t = billTotals(b, db.companies.find((c) => c.id === b.companyId))
+      const cost = costBasis(b.items, b.originalCost)
+      const selling = t.taxable // ex-tax revenue
+      return { b, selling, cost, profit: selling - cost, hasCost: cost > 0 }
+    })
+    .filter((r) => r.hasCost)
+    .sort((a, b) => b.profit - a.profit)
+
+  const totSelling = rows.reduce((s, r) => s + r.selling, 0)
+  const totCost = rows.reduce((s, r) => s + r.cost, 0)
+  const totProfit = totSelling - totCost
+  const exp = () =>
+    exportGenericSheet('Profit Report', ['Invoice', 'Date', 'Company', 'Customer', 'Selling (ex-tax)', 'Cost', 'Profit', 'Margin %'],
+      rows.map((r) => [r.b.companyBillNo, formatDate(r.b.date), companyName(r.b.companyId), r.b.customerName, r.selling, r.cost, r.profit, r.selling ? Math.round((r.profit / r.selling) * 100) : 0]),
+      [4, 5, 6])
+
+  return (
+    <div>
+      <div className="mb-3 rounded-lg bg-amber-50 px-4 py-2.5 text-xs text-amber-700">
+        Profit uses the original/cost price you entered on each bill (never printed). Bills without a cost are excluded.
+      </div>
+      <ReportShell title="Profit / margin" onExport={exp}>
+        <table className="w-full">
+          <thead className="bg-slate-50"><tr><th className="th">Invoice</th><th className="th">Customer</th><th className="th text-right">Selling (ex-tax)</th><th className="th text-right">Cost</th><th className="th text-right">Profit</th><th className="th text-right">Margin</th></tr></thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map(({ b, selling, cost, profit }) => (
+              <tr key={b.id} className="even:bg-slate-50/40">
+                <td className="td font-medium">{b.companyBillNo}</td>
+                <td className="td">{b.customerName}</td>
+                <td className="td text-right tnum">{formatINR(selling)}</td>
+                <td className="td text-right tnum text-slate-500">{formatINR(cost)}</td>
+                <td className={`td text-right font-medium tnum ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatINR(profit)}</td>
+                <td className="td text-right tnum text-slate-500">{selling ? Math.round((profit / selling) * 100) : 0}%</td>
+              </tr>
+            ))}
+            {rows.length === 0 && <tr><td colSpan={6} className="td py-6 text-center text-slate-400">No bills with a cost entered yet.</td></tr>}
+          </tbody>
+          <tfoot>
+            <tr className="bg-slate-50 font-semibold">
+              <td className="td" colSpan={2}>Total</td>
+              <td className="td text-right tnum">{formatINR(totSelling)}</td>
+              <td className="td text-right tnum">{formatINR(totCost)}</td>
+              <td className={`td text-right tnum ${totProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatINR(totProfit)}</td>
+              <td className="td text-right tnum">{totSelling ? Math.round((totProfit / totSelling) * 100) : 0}%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </ReportShell>
+    </div>
   )
 }
 

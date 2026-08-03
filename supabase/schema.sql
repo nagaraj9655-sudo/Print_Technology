@@ -6,12 +6,15 @@
 
 -- ---------- Profiles (one row per auth user, holds the app role) ------------
 create table if not exists public.profiles (
-  id         uuid primary key references auth.users(id) on delete cascade,
-  name       text not null default '',
-  email      text not null default '',
-  role       text not null default 'Operator' check (role in ('Admin','Operator')),
-  created_at timestamptz not null default now()
+  id            uuid primary key references auth.users(id) on delete cascade,
+  name          text not null default '',
+  email         text not null default '',
+  role          text not null default 'Operator' check (role in ('Admin','Operator')),
+  allowed_menus jsonb, -- Operator menu access (null = full access)
+  created_at    timestamptz not null default now()
 );
+-- If upgrading an existing project, make sure the column exists:
+alter table public.profiles add column if not exists allowed_menus jsonb;
 
 -- Is the current caller an Admin?  (security definer so it can read profiles)
 create or replace function public.is_admin()
@@ -62,9 +65,11 @@ create table if not exists public.companies (
   template       text,
   font_family    text,
   terms          text,
+  handbooks      jsonb not null default '[]'::jsonb,
   is_active      boolean not null default true,
   updated_at     timestamptz not null default now()
 );
+alter table public.companies add column if not exists handbooks jsonb not null default '[]'::jsonb;
 
 create table if not exists public.customers (
   id         uuid primary key default gen_random_uuid(),
@@ -91,6 +96,12 @@ create table if not exists public.bills (
   items               jsonb not null default '[]'::jsonb,
   discount_amount     numeric not null default 0,
   discount_is_percent boolean default false,
+  gst_enabled         boolean,
+  original_cost       numeric,
+  bill_type           text default 'Online',
+  handbook_id         uuid,
+  hand_book_no        text,
+  hand_bill_no        text,
   received_amount     numeric not null default 0,
   payments            jsonb not null default '[]'::jsonb,
   doc_status          text not null default 'Draft',
@@ -115,6 +126,8 @@ create table if not exists public.quotations (
   items               jsonb not null default '[]'::jsonb,
   discount_amount     numeric not null default 0,
   discount_is_percent boolean default false,
+  gst_enabled         boolean,
+  original_cost       numeric,
   status              text not null default 'Draft',
   valid_until         date,
   converted_bill_id   uuid,
