@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { EmptyState, Modal, useConfirm, useToast } from '../components/ui'
+import { EmptyState, Modal, Section, useConfirm, useToast } from '../components/ui'
 import { uid } from '../lib/db'
-import { parseNumberList } from '../lib/handbooks'
+import { handbookUsage, parseNumberList } from '../lib/handbooks'
 import type { Company, Handbook } from '../lib/types'
 
 export default function Companies() {
@@ -88,6 +88,8 @@ export default function Companies() {
         </div>
       )}
 
+      <BooksOverview companies={db.companies} bills={db.bills} />
+
       {open && (
         <CompanyModal
           company={editing}
@@ -100,6 +102,72 @@ export default function Companies() {
         />
       )}
       {node}
+    </div>
+  )
+}
+
+function BooksOverview({ companies, bills }: { companies: Company[]; bills: import('../lib/types').Bill[] }) {
+  const rows = companies.flatMap((c) =>
+    (c.handbooks ?? []).map((h) => ({ company: c, book: h, usage: handbookUsage(h, bills) })),
+  )
+  if (rows.length === 0) return null
+
+  return (
+    <div className="mt-6">
+      <Section title="Manual bill books — usage overview">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="th">Company</th>
+                <th className="th">Book</th>
+                <th className="th">Worker</th>
+                <th className="th">Range</th>
+                <th className="th w-40">Used</th>
+                <th className="th text-right">Remaining</th>
+                <th className="th text-right">Next</th>
+                <th className="th">Damaged</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map(({ company, book, usage }) => {
+                const start = book.startNo || 1
+                const end = start + (book.billsPerBook || 0) - 1
+                const usedCount = usage.total - usage.remaining
+                const pct = usage.total ? Math.round((usedCount / usage.total) * 100) : 0
+                return (
+                  <tr key={company.id + book.id} className="even:bg-slate-50/40">
+                    <td className="td text-slate-500">{company.name}</td>
+                    <td className="td">
+                      <span className="font-medium text-slate-800">{book.name || '—'}</span>
+                      <span className="ml-1 text-xs text-slate-400">(Book {book.bookNo || '—'})</span>
+                    </td>
+                    <td className="td text-slate-500">{book.assignedTo || '—'}</td>
+                    <td className="td tnum text-slate-500">{book.billsPerBook ? `${start}–${end}` : '—'}</td>
+                    <td className="td">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className={`h-full ${usage.full ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="tnum text-xs text-slate-500">{usedCount}/{usage.total}</span>
+                      </div>
+                    </td>
+                    <td className="td text-right tnum">{usage.remaining}</td>
+                    <td className="td text-right">
+                      {usage.full ? (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Full</span>
+                      ) : (
+                        <span className="font-semibold tnum text-brand-700">#{usage.nextAvailable}</span>
+                      )}
+                    </td>
+                    <td className="td tnum text-slate-500">{usage.damaged.length ? usage.damaged.join(', ') : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   )
 }
