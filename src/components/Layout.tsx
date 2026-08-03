@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   PieChart,
+  QrCode,
   Receipt,
   Search,
   Settings as SettingsIcon,
@@ -18,6 +19,7 @@ import {
 import { useStore } from '../lib/store'
 import { formatINR } from '../lib/format'
 import { canAccess } from '../lib/menus'
+import { PayQrModal } from './PayQrModal'
 
 const NAV = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -95,6 +97,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 function TopBar({ onMenu }: { onMenu: () => void }) {
   const { currentUser, logout } = useStore()
   const [userMenu, setUserMenu] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
 
   return (
     <header className="no-print z-20 flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 sm:px-6">
@@ -105,7 +108,16 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
       <CompanySwitcher />
       <GlobalSearch />
 
-      <div className="relative ml-auto">
+      <button
+        onClick={() => setQrOpen(true)}
+        title="Show payment QR"
+        className="ml-auto flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+      >
+        <QrCode className="h-4 w-4" /> <span className="hidden sm:inline">Pay QR</span>
+      </button>
+      <PayQrModal open={qrOpen} onClose={() => setQrOpen(false)} />
+
+      <div className="relative">
         <button
           onClick={() => setUserMenu((v) => !v)}
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"

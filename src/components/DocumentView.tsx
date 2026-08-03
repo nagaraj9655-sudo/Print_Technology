@@ -114,7 +114,7 @@ function StatusStamp({ status }: { status: string }) {
 
 function AmountWords({ amount }: { amount: number }) {
   return (
-    <div className="mt-3 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+    <div className="mt-3 rounded border border-slate-300 px-3 py-2 text-xs text-slate-700">
       <span className="font-semibold">Amount in words:</span> {amountInWords(amount)}
     </div>
   )
@@ -129,30 +129,21 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
   return (
     <div className="p-8 print:p-0">
       {showHeader ? (
-        <div
-          className="flex items-start justify-between rounded-xl p-5 text-white"
-          style={{ background: `linear-gradient(115deg, ${accent} 0%, ${accent2} 100%)` }}
-        >
+        <div className="flex items-start justify-between border-b-4 pb-4" style={{ borderColor: accent }}>
           <div className="flex items-start gap-3">
-            {company?.logoDataUrl && (
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-white/15 p-1.5 ring-1 ring-white/30">
-                <img src={company.logoDataUrl} alt="" className="h-full w-full object-contain" />
-              </div>
-            )}
+            {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-16 w-16 object-contain" />}
             <div>
-              <h1 className="text-xl font-extrabold leading-tight">{company?.name}</h1>
-              <p className="mt-1 max-w-xs text-xs leading-relaxed text-white/85">{company?.address}</p>
-              <p className="mt-1 text-xs text-white/85">
+              <h1 className="text-2xl font-extrabold leading-tight" style={{ color: accent }}>{company?.name}</h1>
+              <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">{company?.address}</p>
+              <p className="mt-1 text-xs text-slate-500">
                 {company?.phone && <>☎ {company.phone}</>}
                 {company?.email && <> · {company.email}</>}
               </p>
-              {gst && <p className="mt-0.5 text-xs font-semibold">GSTIN: {company?.gstin}</p>}
+              {gst && <p className="mt-0.5 text-xs font-semibold text-slate-700">GSTIN: {company?.gstin}</p>}
             </div>
           </div>
           <div className="text-right">
-            <div className="rounded-lg bg-white/15 px-3 py-1.5 text-lg font-extrabold uppercase tracking-wide ring-1 ring-white/30">
-              {title}
-            </div>
+            <div className="text-xl font-extrabold uppercase tracking-wide" style={{ color: accent }}>{title}</div>
           </div>
         </div>
       ) : (
@@ -180,19 +171,19 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
       {/* Items */}
       <table className="mt-5 w-full border-collapse text-sm">
         <thead>
-          <tr style={{ background: accent }} className="text-white">
-            <Th className="text-left">#</Th>
-            <Th className="text-left">Description</Th>
-            {gst && <Th className="text-left">HSN/SAC</Th>}
-            <Th className="text-right">Qty</Th>
-            <Th className="text-right">Rate</Th>
-            {gst && <Th className="text-right">GST%</Th>}
-            <Th className="text-right">Amount</Th>
+          <tr className="border-b-2" style={{ borderColor: accent }}>
+            <th className="px-2 py-2 text-left text-xs font-bold uppercase" style={{ color: accent }}>#</th>
+            <th className="px-2 py-2 text-left text-xs font-bold uppercase" style={{ color: accent }}>Description</th>
+            {gst && <th className="px-2 py-2 text-left text-xs font-bold uppercase" style={{ color: accent }}>HSN/SAC</th>}
+            <th className="px-2 py-2 text-right text-xs font-bold uppercase" style={{ color: accent }}>Qty</th>
+            <th className="px-2 py-2 text-right text-xs font-bold uppercase" style={{ color: accent }}>Rate</th>
+            {gst && <th className="px-2 py-2 text-right text-xs font-bold uppercase" style={{ color: accent }}>GST%</th>}
+            <th className="px-2 py-2 text-right text-xs font-bold uppercase" style={{ color: accent }}>Amount</th>
           </tr>
         </thead>
         <tbody>
           {doc.items.map((it, i) => (
-            <tr key={it.id} className="border-b border-slate-200 even:bg-slate-50">
+            <tr key={it.id} className="border-b border-slate-200">
               <td className="px-2 py-2 text-slate-400">{i + 1}</td>
               <td className="px-2 py-2 font-medium text-slate-800">{it.description}</td>
               {gst && <td className="px-2 py-2 text-slate-500">{it.hsnSac || '—'}</td>}
@@ -395,8 +386,8 @@ function TotalsBlock({ ctx, variant }: { ctx: Ctx; variant: 'card' | 'ruled' }) 
         {gst && t.cgst > 0 && <TotalRow label="CGST" value={formatINR(t.cgst)} />}
         {gst && t.sgst > 0 && <TotalRow label="SGST" value={formatINR(t.sgst)} />}
         <div
-          className="my-1.5 flex items-center justify-between rounded px-2 py-1.5 font-bold text-white"
-          style={{ background: accent }}
+          className="my-1.5 flex items-center justify-between rounded border-2 px-2 py-1.5 font-bold"
+          style={{ borderColor: accent, color: accent }}
         >
           <span>{isBill ? 'Net Payable' : 'Total'}</span>
           <span className="tnum">{formatINR(t.net)}</span>

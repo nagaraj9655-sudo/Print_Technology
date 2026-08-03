@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { MessageCircle, Smartphone } from 'lucide-react'
+import { Download, MessageCircle, Share2, Smartphone } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { formatDate, formatINR } from '../lib/format'
 import { buildReminderMessage, smsLink, whatsappLink } from '../lib/payments'
+import { canShareFiles, dataUrlToFile, upiQrDataUrl } from '../lib/qr'
+import { useToast } from './ui'
 import { Modal } from './ui'
 import { UpiQr } from './UpiQr'
 
@@ -17,6 +19,7 @@ export interface ReminderTarget {
 // scope) into a single WhatsApp / SMS reminder, with a scannable UPI QR to pay.
 export function PaymentReminder({ open, onClose, target }: { open: boolean; onClose: () => void; target: ReminderTarget | null }) {
   const { db, activeCompanyId } = useStore()
+  const toast = useToast()
 
   const data = useMemo(() => {
     if (!target) return null
@@ -67,6 +70,46 @@ export function PaymentReminder({ open, onClose, target }: { open: boolean; onCl
     setMessage(defaultMessage)
   }
 
+  const makeQrDataUrl = async () => {
+    if (!data?.payCompany?.upiId) return ''
+    return upiQrDataUrl({
+      pa: data.payCompany.upiId,
+      pn: data.payCompany.payeeName || data.payCompany.name,
+      am: data.total,
+      tn: `Bills ${data.pend.map((x) => x.b.companyBillNo).join(', ')}`.slice(0, 60),
+      size: 420,
+    })
+  }
+
+  const downloadQr = async () => {
+    const url = await makeQrDataUrl()
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `payment-qr-${target?.customerName || 'customer'}.png`.replace(/\s+/g, '_')
+    a.click()
+    toast('QR image downloaded')
+  }
+
+  // Share the QR image + message together (native share sheet → pick WhatsApp).
+  const shareWithQr = async () => {
+    const url = await makeQrDataUrl()
+    if (!url) return
+    const file = dataUrlToFile(url, 'payment-qr.png')
+    if (canShareFiles(file)) {
+      try {
+        await navigator.share({ files: [file], text: message, title: 'Payment reminder' })
+      } catch {
+        /* user cancelled */
+      }
+    } else {
+      // Desktop fallback: download the QR so it can be attached, then open WhatsApp text.
+      await downloadQr()
+      window.open(whatsappLink(phone, message), '_blank')
+      toast('QR downloaded — attach it in the WhatsApp chat that opened', 'info')
+    }
+  }
+
   if (!open || !target || !data) return null
 
   const noPhone = !phone.trim()
@@ -88,22 +131,30 @@ export function PaymentReminder({ open, onClose, target }: { open: boolean; onCl
               <textarea className="input min-h-[180px] font-mono text-xs" value={message} onChange={(e) => setMessage(e.target.value)} />
             </div>
             <div className="flex flex-wrap gap-2">
+              {!noUpi && (
+                <button className="btn bg-emerald-600 text-white hover:bg-emerald-700" onClick={shareWithQr}>
+                  <Share2 className="h-4 w-4" /> Share with QR
+                </button>
+              )}
               <a
-                className={`btn ${noPhone ? 'pointer-events-none opacity-50' : ''} bg-emerald-600 text-white hover:bg-emerald-700`}
+                className={`btn-outline ${noPhone ? 'pointer-events-none opacity-50' : ''}`}
                 href={whatsappLink(phone, message)}
                 target="_blank"
                 rel="noreferrer"
               >
-                <MessageCircle className="h-4 w-4" /> Send on WhatsApp
+                <MessageCircle className="h-4 w-4" /> WhatsApp (text)
               </a>
               <a
                 className={`btn-outline ${noPhone ? 'pointer-events-none opacity-50' : ''}`}
                 href={smsLink(phone, message)}
               >
-                <Smartphone className="h-4 w-4" /> Send as SMS
+                <Smartphone className="h-4 w-4" /> SMS
               </a>
             </div>
-            {noPhone && <p className="text-xs text-red-500">Enter the customer's mobile number to send.</p>}
+            <p className="text-xs text-slate-400">
+              “Share with QR” opens your phone's share sheet so you can send the message <strong>and</strong> the QR image together on WhatsApp. On a computer it downloads the QR and opens WhatsApp so you can attach it.
+            </p>
+            {noPhone && <p className="text-xs text-red-500">Enter the customer's mobile number for the text-only options.</p>}
           </div>
 
           <div className="space-y-2 rounded-lg border border-slate-200 p-3 text-center">
@@ -123,6 +174,9 @@ export function PaymentReminder({ open, onClose, target }: { open: boolean; onCl
                 />
                 <p className="tnum text-sm font-semibold text-slate-700">{formatINR(data.total)}</p>
                 <p className="break-all text-xs text-slate-400">{data.payCompany!.upiId}</p>
+                <button className="btn-outline mt-1 w-full justify-center py-1 text-xs" onClick={downloadQr}>
+                  <Download className="h-3.5 w-3.5" /> Download QR
+                </button>
               </>
             )}
           </div>

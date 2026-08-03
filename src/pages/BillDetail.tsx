@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  BellRing,
   Copy,
   FileSpreadsheet,
   Pencil,
@@ -13,6 +14,7 @@ import { HeaderToggle } from '../components/HeaderToggle'
 import { useStore } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { DocumentView } from '../components/DocumentView'
+import { PaymentReminder, type ReminderTarget } from '../components/PaymentReminder'
 import { Modal, useConfirm, useToast } from '../components/ui'
 import { exportBillExcel } from '../lib/excel'
 import { formatDate, formatINR, todayISO } from '../lib/format'
@@ -25,6 +27,7 @@ export default function BillDetail() {
   const { confirm, node: confirmNode } = useConfirm()
   const [payOpen, setPayOpen] = useState(false)
   const [showHeader, setShowHeader] = useState(true)
+  const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
 
   const bill = db.bills.find((b) => b.id === id)
   if (!bill) return <div className="text-slate-500">Bill not found.</div>
@@ -58,6 +61,14 @@ export default function BillDetail() {
           {t.balance > 0.001 && bill.docStatus === 'Finalized' && (
             <button className="btn-primary" onClick={() => setPayOpen(true)}>
               <Wallet className="h-4 w-4" /> Record Payment
+            </button>
+          )}
+          {t.balance > 0.001 && bill.docStatus === 'Finalized' && (
+            <button
+              className="btn-outline text-amber-600 hover:bg-amber-50"
+              onClick={() => setReminderTarget({ customerId: bill.customerId, customerName: bill.customerName, customerPhone: bill.customerPhone })}
+            >
+              <BellRing className="h-4 w-4" /> Remind
             </button>
           )}
           <button className="btn-outline" onClick={() => window.print()}>
@@ -130,6 +141,7 @@ export default function BillDetail() {
         }}
       />
       {confirmNode}
+      <PaymentReminder open={!!reminderTarget} onClose={() => setReminderTarget(null)} target={reminderTarget} />
     </div>
   )
 }
