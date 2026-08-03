@@ -83,6 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar onMenu={() => setSidebarOpen(true)} />
+        <SyncBanner />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</div>
         </main>
@@ -259,5 +260,23 @@ function GlobalSearch() {
         </>
       )}
     </div>
+  )
+}
+
+function SyncBanner() {
+  const { mode, syncError } = useStore()
+  return (
+    <>
+      {mode === 'local' && (
+        <div className="no-print flex items-center gap-2 bg-amber-50 px-4 py-1.5 text-xs text-amber-700 border-b border-amber-200">
+          ⚠ Running in <strong>local mode</strong> — data is stored in this browser only. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to connect to Supabase.
+        </div>
+      )}
+      {syncError && (
+        <div className="no-print flex items-center gap-2 bg-red-50 px-4 py-1.5 text-xs text-red-700 border-b border-red-200">
+          🔴 {syncError}
+        </div>
+      )}
+    </>
   )
 }

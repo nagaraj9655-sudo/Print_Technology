@@ -26,6 +26,7 @@ interface StoreValue {
   currentUser: User | null
   mode: BackendMode
   ready: boolean // false while a Supabase session/data load is in flight
+  syncError: string | null // visible sync error message
   activeCompanyId: string | 'ALL'
   setActiveCompanyId: (id: string | 'ALL') => void
   activeCompany: Company | undefined
@@ -113,6 +114,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const mode: BackendMode = isSupabaseConfigured ? 'supabase' : 'local'
   const [db, setDb] = useState<Database>(() => (mode === 'supabase' ? emptyDatabase() : load()))
   const [ready, setReady] = useState(mode === 'local')
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (mode === 'supabase') return null
     try {
@@ -197,7 +199,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (mode === 'local') { save(db); return }
     if (!ready || !currentUser) return
     if (skipSync.current) { skipSync.current = false; return }
-    const handle = setTimeout(() => { void remote.syncAll(db).catch((e) => console.error('Sync failed', e)) }, 500)
+    const handle = setTimeout(() => {
+      void remote.syncAll(db)
+        .then(() => setSyncError(null))
+        .catch((e) => {
+          const msg = (e as Error)?.message ?? String(e)
+          console.error('Sync failed', e)
+          setSyncError(`Sync failed: ${msg}`)
+        })
+    }, 500)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db])
@@ -688,6 +698,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     currentUser,
     mode,
     ready,
+    syncError,
     activeCompanyId,
     setActiveCompanyId,
     activeCompany,
