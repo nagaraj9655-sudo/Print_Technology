@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Bar,
@@ -13,16 +13,36 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { AlertCircle, IndianRupee, Receipt, TrendingUp, Wallet } from 'lucide-react'
+import { AlertCircle, BellRing, IndianRupee, Receipt, TrendingUp, Wallet } from 'lucide-react'
 import { useStore, useScopedBills, useScopedQuotes } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { daysBetween, formatDate, formatINR } from '../lib/format'
 import { KpiCard, Section, StatusPill } from '../components/ui'
+import { PaymentReminder, type ReminderTarget } from '../components/PaymentReminder'
 
 export default function Dashboard() {
   const { db, activeCompanyId } = useStore()
   const bills = useScopedBills()
   const quotes = useScopedQuotes()
+  const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
+
+  // Customers with outstanding balances, oldest first — one-click reminders.
+  const remindersDue = useMemo(() => {
+    const map = new Map<string, { key: string; customerId?: string; name: string; phone: string; total: number; count: number; oldestAge: number }>()
+    for (const b of bills) {
+      if (b.docStatus !== 'Finalized') continue
+      const t = billTotals(b, db.companies.find((c) => c.id === b.companyId))
+      if (t.balance <= 0.001) continue
+      const key = b.customerId ?? `${b.customerName}|${b.customerPhone}`
+      const age = daysBetween(b.date)
+      const cur = map.get(key) ?? { key, customerId: b.customerId, name: b.customerName, phone: b.customerPhone, total: 0, count: 0, oldestAge: 0 }
+      cur.total += t.balance
+      cur.count += 1
+      cur.oldestAge = Math.max(cur.oldestAge, age)
+      map.set(key, cur)
+    }
+    return [...map.values()].sort((a, b) => b.oldestAge - a.oldestAge)
+  }, [bills, db.companies])
 
   const data = useMemo(() => {
     const finalized = bills.filter((b) => b.docStatus === 'Finalized')
@@ -249,6 +269,54 @@ export default function Dashboard() {
           </Section>
         </div>
       )}
+
+      {/* Reminders due — customers with outstanding, oldest first */}
+      <div className="mt-5">
+        <Section title="Reminders due" action={<span className="text-xs text-slate-400">{remindersDue.length} customer{remindersDue.length === 1 ? '' : 's'} owe money</span>}>
+          {remindersDue.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-400">Nothing to chase — all bills settled. 🎉</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="th">Customer</th>
+                    <th className="th text-right">Bills</th>
+                    <th className="th text-right">Outstanding</th>
+                    <th className="th text-right">Oldest</th>
+                    <th className="th text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {remindersDue.slice(0, 10).map((r) => (
+                    <tr key={r.key} className="hover:bg-slate-50">
+                      <td className="td">
+                        <p className="font-medium text-slate-800">{r.name}</p>
+                        <p className="text-xs text-slate-400">{r.phone || 'no phone'}</p>
+                      </td>
+                      <td className="td text-right tnum text-slate-500">{r.count}</td>
+                      <td className="td text-right font-medium tnum text-red-600">{formatINR(r.total)}</td>
+                      <td className="td text-right tnum">
+                        <span className={r.oldestAge > 90 ? 'font-semibold text-red-600' : r.oldestAge > 60 ? 'text-orange-600' : 'text-slate-500'}>{r.oldestAge}d</span>
+                      </td>
+                      <td className="td text-right">
+                        <button
+                          className="btn-outline ml-auto py-1 text-amber-600 hover:bg-amber-50"
+                          onClick={() => setReminderTarget({ customerId: r.customerId, customerName: r.name, customerPhone: r.phone })}
+                        >
+                          <BellRing className="h-4 w-4" /> Remind
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+      </div>
+
+      <PaymentReminder open={!!reminderTarget} onClose={() => setReminderTarget(null)} target={reminderTarget} />
     </div>
   )
 }

@@ -134,8 +134,8 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
             {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-16 w-16 object-contain" />}
             <div>
               <h1 className="text-2xl font-extrabold leading-tight" style={{ color: accent }}>{company?.name}</h1>
-              <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">{company?.address}</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-700">{company?.address}</p>
+              <p className="mt-1 text-xs text-slate-700">
                 {company?.phone && <>☎ {company.phone}</>}
                 {company?.email && <> · {company.email}</>}
               </p>
@@ -153,10 +153,10 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
       {/* Meta + bill to */}
       <div className="mt-6 grid grid-cols-2 gap-6">
         <div className="border-l-4 pl-3" style={{ borderColor: accent }}>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{isBill ? 'Bill To' : 'Quotation For'}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{isBill ? 'Bill To' : 'Quotation For'}</p>
           <p className="mt-1 font-bold text-slate-900">{doc.customerName || '—'}</p>
-          <p className="text-xs leading-relaxed text-slate-500">{doc.customerAddress}</p>
-          {doc.customerPhone && <p className="text-xs text-slate-500">☎ {doc.customerPhone}</p>}
+          <p className="text-xs leading-relaxed text-slate-700">{doc.customerAddress}</p>
+          {doc.customerPhone && <p className="text-xs text-slate-700">☎ {doc.customerPhone}</p>}
           {gst && doc.customerGstin && <p className="mt-0.5 text-xs font-medium text-slate-600">GSTIN: {doc.customerGstin}</p>}
         </div>
         <div className="space-y-1 text-right text-sm">
@@ -183,13 +183,13 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
         </thead>
         <tbody>
           {doc.items.map((it, i) => (
-            <tr key={it.id} className="border-b border-slate-200">
-              <td className="px-2 py-2 text-slate-400">{i + 1}</td>
+            <tr key={it.id} className="border-b border-slate-300">
+              <td className="px-2 py-2 text-slate-600">{i + 1}</td>
               <td className="px-2 py-2 font-medium text-slate-800">{it.description}</td>
-              {gst && <td className="px-2 py-2 text-slate-500">{it.hsnSac || '—'}</td>}
+              {gst && <td className="px-2 py-2 text-slate-700">{it.hsnSac || '—'}</td>}
               <td className="px-2 py-2 text-right tnum">{it.qty}</td>
               <td className="px-2 py-2 text-right tnum">{formatINR(it.rate, false)}</td>
-              {gst && <td className="px-2 py-2 text-right tnum text-slate-500">{it.taxRate ?? 0}%</td>}
+              {gst && <td className="px-2 py-2 text-right tnum text-slate-700">{it.taxRate ?? 0}%</td>}
               <td className="px-2 py-2 text-right font-semibold tnum">{formatINR(lineTotal(it), false)}</td>
             </tr>
           ))}
@@ -199,7 +199,7 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
       <TotalsBlock ctx={ctx} variant="card" />
       {isBill && <AmountWords amount={t.net} />}
       <Footer ctx={ctx} />
-      <p className="mt-4 text-center text-[10px] text-slate-400">{settings.invoiceFooter}</p>
+      <p className="mt-4 text-center text-[10px] text-slate-600">{settings.invoiceFooter}</p>
     </div>
   )
 }
@@ -218,8 +218,8 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
           <h1 className="text-2xl font-bold tracking-wide text-slate-900" style={{ letterSpacing: '0.04em' }}>
             {company?.name}
           </h1>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">{company?.address}</p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-700">{company?.address}</p>
+          <p className="mt-0.5 text-xs text-slate-700">
             {company?.phone && <>☎ {company.phone}</>}
             {company?.email && <> · {company.email}</>}
             {gst && <> · GSTIN: {company?.gstin}</>}
@@ -243,10 +243,10 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
 
       <div className="mt-6 flex justify-between border-y-2 py-3 text-sm" style={{ borderColor: accent }}>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{isBill ? 'Bill To' : 'Quotation For'}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{isBill ? 'Bill To' : 'Quotation For'}</p>
           <p className="mt-1 font-bold text-slate-900">{doc.customerName || '—'}</p>
-          <p className="text-xs leading-relaxed text-slate-500">{doc.customerAddress}</p>
-          {doc.customerPhone && <p className="text-xs text-slate-500">☎ {doc.customerPhone}</p>}
+          <p className="text-xs leading-relaxed text-slate-700">{doc.customerAddress}</p>
+          {doc.customerPhone && <p className="text-xs text-slate-700">☎ {doc.customerPhone}</p>}
           {gst && doc.customerGstin && <p className="text-xs text-slate-600">GSTIN: {doc.customerGstin}</p>}
         </div>
         <div className="space-y-1 text-right">
@@ -271,13 +271,13 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
         </thead>
         <tbody>
           {doc.items.map((it, i) => (
-            <tr key={it.id} className="border-b border-slate-200">
-              <td className="px-2 py-2.5 text-slate-400">{i + 1}</td>
+            <tr key={it.id} className="border-b border-slate-300">
+              <td className="px-2 py-2.5 text-slate-600">{i + 1}</td>
               <td className="px-2 py-2.5 text-slate-800">{it.description}</td>
-              {gst && <td className="px-2 py-2.5 text-slate-500">{it.hsnSac || '—'}</td>}
+              {gst && <td className="px-2 py-2.5 text-slate-700">{it.hsnSac || '—'}</td>}
               <td className="px-2 py-2.5 text-right tnum">{it.qty}</td>
               <td className="px-2 py-2.5 text-right tnum">{formatINR(it.rate, false)}</td>
-              {gst && <td className="px-2 py-2.5 text-right tnum text-slate-500">{it.taxRate ?? 0}%</td>}
+              {gst && <td className="px-2 py-2.5 text-right tnum text-slate-700">{it.taxRate ?? 0}%</td>}
               <td className="px-2 py-2.5 text-right font-medium tnum">{formatINR(lineTotal(it), false)}</td>
             </tr>
           ))}
@@ -292,7 +292,7 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
         </div>
       )}
       <Footer ctx={ctx} />
-      <p className="mt-4 text-center text-[10px] italic text-slate-400">{settings.invoiceFooter}</p>
+      <p className="mt-4 text-center text-[10px] italic text-slate-600">{settings.invoiceFooter}</p>
     </div>
   )
 }
@@ -311,31 +311,31 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
             {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-12 w-12 object-contain" />}
             <div>
               <h1 className="text-lg font-bold text-slate-900">{company?.name}</h1>
-              <p className="max-w-xs text-xs text-slate-500">{company?.address}</p>
-              <p className="text-xs text-slate-500">{company?.phone}{gst && <> · GSTIN {company?.gstin}</>}</p>
+              <p className="max-w-xs text-xs text-slate-700">{company?.address}</p>
+              <p className="text-xs text-slate-700">{company?.phone}{gst && <> · GSTIN {company?.gstin}</>}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs uppercase tracking-widest text-slate-400">{title}</p>
+            <p className="text-xs uppercase tracking-widest text-slate-600">{title}</p>
             <p className="text-lg font-bold" style={{ color: accent }}>{docNo}</p>
-            <p className="text-xs text-slate-500">{formatDate(doc.date)}</p>
+            <p className="text-xs text-slate-700">{formatDate(doc.date)}</p>
           </div>
         </div>
       ) : (
         <>
           <LetterheadSpacer mm={topMm} />
           <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-widest text-slate-400">{title}</p>
+            <p className="text-xs uppercase tracking-widest text-slate-600">{title}</p>
             <p className="text-sm font-bold text-slate-700">{docNo} · {formatDate(doc.date)}</p>
           </div>
         </>
       )}
 
       <div className="mt-5 text-sm">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{isBill ? 'Bill To' : 'Quotation For'}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{isBill ? 'Bill To' : 'Quotation For'}</p>
         <p className="font-semibold text-slate-900">{doc.customerName}</p>
-        <p className="text-xs text-slate-500">{doc.customerAddress}{doc.customerPhone ? ` · ☎ ${doc.customerPhone}` : ''}</p>
-        {validUntil && <p className="text-xs text-slate-500">Valid until {formatDate(validUntil)}</p>}
+        <p className="text-xs text-slate-700">{doc.customerAddress}{doc.customerPhone ? ` · ☎ ${doc.customerPhone}` : ''}</p>
+        {validUntil && <p className="text-xs text-slate-700">Valid until {formatDate(validUntil)}</p>}
       </div>
 
       <table className="mt-4 w-full border-collapse text-sm">
@@ -350,9 +350,9 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
         </thead>
         <tbody>
           {doc.items.map((it) => (
-            <tr key={it.id} className="border-b border-slate-100">
+            <tr key={it.id} className="border-b border-slate-300">
               <td className="px-2 py-2 text-slate-800">{it.description}</td>
-              {gst && <td className="px-2 py-2 text-slate-500">{it.hsnSac || '—'}</td>}
+              {gst && <td className="px-2 py-2 text-slate-700">{it.hsnSac || '—'}</td>}
               <td className="px-2 py-2 text-right tnum">{it.qty}</td>
               <td className="px-2 py-2 text-right tnum">{formatINR(it.rate, false)}</td>
               <td className="px-2 py-2 text-right font-medium tnum">{formatINR(lineTotal(it), false)}</td>
@@ -364,7 +364,7 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
       <TotalsBlock ctx={ctx} variant="ruled" />
       {isBill && <AmountWords amount={t.net} />}
       <Footer ctx={ctx} />
-      <p className="mt-4 text-[10px] text-slate-400">{settings.invoiceFooter}</p>
+      <p className="mt-4 text-[10px] text-slate-600">{settings.invoiceFooter}</p>
     </div>
   )
 }
@@ -378,7 +378,7 @@ function TotalsBlock({ ctx, variant }: { ctx: Ctx; variant: 'card' | 'ruled' }) 
   const boxed = variant === 'card'
   return (
     <div className="mt-4 flex justify-end">
-      <div className={`w-72 text-sm ${boxed ? 'rounded-lg border border-slate-200 p-3' : ''}`}>
+      <div className={`w-72 text-sm ${boxed ? 'rounded-lg border border-slate-300 p-3' : ''}`}>
         <TotalRow label="Gross" value={formatINR(t.gross)} />
         {t.discount > 0 && <TotalRow label="Discount" value={`− ${formatINR(t.discount)}`} />}
         {gst && <TotalRow label="Taxable Value" value={formatINR(t.taxable)} />}
@@ -409,30 +409,30 @@ function Footer({ ctx }: { ctx: Ctx }) {
   const showQr = isBill && !!company?.upiId && t.balance > 0.001
   const qrAmount = t.balance > 0.001 ? t.balance : t.net
   return (
-    <div className="mt-6 grid grid-cols-2 gap-6 border-t border-slate-200 pt-4 text-xs">
+    <div className="mt-6 grid grid-cols-2 gap-6 border-t border-slate-300 pt-4 text-xs">
       <div className="space-y-2">
         {(company?.bankDetails || company?.upiId) && (
           <div>
             <p className="font-semibold text-slate-600">Payment details</p>
-            {company?.bankDetails && <p className="text-slate-500">{company.bankDetails}</p>}
-            {company?.upiId && <p className="text-slate-500">UPI (GPay/PhonePe): {company.upiId}</p>}
+            {company?.bankDetails && <p className="text-slate-700">{company.bankDetails}</p>}
+            {company?.upiId && <p className="text-slate-700">UPI (GPay/PhonePe): {company.upiId}</p>}
           </div>
         )}
         <div>
           <p className="font-semibold text-slate-600">Terms &amp; Conditions</p>
-          <p className="text-slate-500">{company?.terms || 'Thank you for your business.'}</p>
+          <p className="text-slate-700">{company?.terms || 'Thank you for your business.'}</p>
         </div>
       </div>
       <div className="flex items-end justify-end gap-4">
         {showQr && (
           <div className="text-center">
-            <UpiQr upiId={company!.upiId!} payeeName={company!.payeeName || company!.name} amount={qrAmount} note={ctx.docNo} size={92} className="rounded border border-slate-200" />
-            <p className="mt-0.5 text-[10px] text-slate-500">Scan to pay</p>
+            <UpiQr upiId={company!.upiId!} payeeName={company!.payeeName || company!.name} amount={qrAmount} note={ctx.docNo} size={92} className="rounded border border-slate-300" />
+            <p className="mt-0.5 text-[10px] text-slate-700">Scan to pay</p>
           </div>
         )}
         <div className="text-right">
-          <p className="text-slate-500">For {company?.name}</p>
-          <div className="mt-10 border-t border-slate-300 pt-1 text-slate-500">Authorised Signatory</div>
+          <p className="text-slate-700">For {company?.name}</p>
+          <div className="mt-10 border-t border-slate-300 pt-1 text-slate-700">Authorised Signatory</div>
         </div>
       </div>
     </div>
@@ -442,7 +442,7 @@ function Footer({ ctx }: { ctx: Ctx }) {
 function Meta({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex justify-end gap-3">
-      <span className="text-slate-400">{label}:</span>
+      <span className="text-slate-600">{label}:</span>
       <span className={strong ? 'font-bold text-slate-900' : 'text-slate-600'}>{value}</span>
     </div>
   )
@@ -451,7 +451,7 @@ function Meta({ label, value, strong }: { label: string; value: string; strong?:
 function TotalRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex justify-between py-0.5">
-      <span className={strong ? 'font-semibold text-slate-700' : 'text-slate-500'}>{label}</span>
+      <span className={strong ? 'font-semibold text-slate-700' : 'text-slate-700'}>{label}</span>
       <span className={`tnum ${strong ? 'font-bold text-slate-900' : 'text-slate-700'}`}>{value}</span>
     </div>
   )

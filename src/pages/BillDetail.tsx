@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   Pencil,
   Printer,
+  Share2,
   Trash2,
   Wallet,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { PaymentReminder, type ReminderTarget } from '../components/PaymentRemin
 import { Modal, useConfirm, useToast } from '../components/ui'
 import { exportBillExcel } from '../lib/excel'
 import { formatDate, formatINR, todayISO } from '../lib/format'
+import { elementToPngFile, shareImageFile } from '../lib/share'
 
 export default function BillDetail() {
   const { id } = useParams()
@@ -49,6 +51,26 @@ export default function BillDetail() {
     navigate(`/bills/${copy.id}/edit`)
   }
 
+  const [sharing, setSharing] = useState(false)
+  const shareBillImage = async () => {
+    const el = document.querySelector('.print-page') as HTMLElement | null
+    if (!el) return
+    setSharing(true)
+    try {
+      const file = await elementToPngFile(el, `${bill.companyBillNo.replace(/[\/\\]/g, '-')}.png`)
+      const caption =
+        `${company?.gstin ? 'Invoice' : 'Bill'} ${bill.companyBillNo} from ${company?.name}\n` +
+        `Amount: ${formatINR(t.net)}${t.balance > 0.001 ? ` · Balance due: ${formatINR(t.balance)}` : ' · PAID'}` +
+        (company?.upiId ? `\nPay via UPI: ${company.upiId} (scan the QR in the image)` : '')
+      const how = await shareImageFile(file, caption, bill.customerPhone)
+      toast(how === 'shared' ? 'Bill shared' : 'Bill image downloaded — attach it in WhatsApp', how === 'shared' ? 'success' : 'info')
+    } catch {
+      toast('Could not create the bill image', 'error')
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <div>
       {/* Action bar */}
@@ -71,6 +93,9 @@ export default function BillDetail() {
               <BellRing className="h-4 w-4" /> Remind
             </button>
           )}
+          <button className="btn bg-emerald-600 text-white hover:bg-emerald-700" onClick={shareBillImage} disabled={sharing}>
+            <Share2 className="h-4 w-4" /> {sharing ? 'Preparing…' : 'Share bill'}
+          </button>
           <button className="btn-outline" onClick={() => window.print()}>
             <Printer className="h-4 w-4" /> PDF / Print
           </button>
