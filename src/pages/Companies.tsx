@@ -337,6 +337,35 @@ function CompanyModal({
           )}
           <p className="mt-1 text-xs text-slate-400">Printed above the signatory name on bills &amp; quotes. Use a transparent PNG for best results.</p>
         </div>
+        <div className="sm:col-span-2">
+          <label className="label">Footer image (optional)</label>
+          <input type="file" accept="image/*" className="text-xs text-slate-500" onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            const reader = new FileReader()
+            reader.onload = () => set({ footerImageDataUrl: reader.result as string })
+            reader.readAsDataURL(file)
+          }} />
+          {form.footerImageDataUrl && (
+            <div className="mt-2">
+              <div className="flex items-center gap-2">
+                <img src={form.footerImageDataUrl} alt="footer" className="h-16 max-w-xs rounded border border-slate-200 bg-white object-contain" />
+                <button type="button" className="text-xs text-red-500 hover:underline" onClick={() => set({ footerImageDataUrl: undefined })}>Remove</button>
+              </div>
+            </div>
+          )}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <label className="label">Width (mm)</label>
+              <input type="number" min={10} step={1} className="input tnum" placeholder="190" value={form.footerImageWidthMm ?? ''} onChange={(e) => set({ footerImageWidthMm: parseFloat(e.target.value) || undefined })} />
+            </div>
+            <div>
+              <label className="label">Height (mm)</label>
+              <input type="number" min={5} step={1} className="input tnum" placeholder="Auto" value={form.footerImageHeightMm ?? ''} onChange={(e) => set({ footerImageHeightMm: parseFloat(e.target.value) || undefined })} />
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">Printed at the very bottom of bills &amp; quotes. Width defaults to full page (~190 mm); height is auto if blank.</p>
+        </div>
       </div>
 
       {/* Manual bill books (handbills) */}

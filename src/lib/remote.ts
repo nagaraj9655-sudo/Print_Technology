@@ -25,6 +25,9 @@ function companyToRow(c: Company) {
     font_family: c.fontFamily ?? null, terms: c.terms ?? null, handbooks: c.handbooks ?? [],
     default_gst_mode: c.defaultGstMode ?? null, default_bill_type: c.defaultBillType ?? null,
     default_simple_bill: c.defaultSimpleBill ?? null,
+    footer_image_data_url: c.footerImageDataUrl ?? null,
+    footer_image_width_mm: c.footerImageWidthMm ?? null,
+    footer_image_height_mm: c.footerImageHeightMm ?? null,
     is_active: c.isActive, updated_at: new Date().toISOString(),
   }
 }
@@ -39,6 +42,9 @@ function rowToCompany(r: any): Company {
     fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, handbooks: r.handbooks ?? [],
     defaultGstMode: r.default_gst_mode ?? undefined, defaultBillType: r.default_bill_type ?? undefined,
     defaultSimpleBill: r.default_simple_bill ?? undefined,
+    footerImageDataUrl: r.footer_image_data_url ?? undefined,
+    footerImageWidthMm: r.footer_image_width_mm ?? undefined,
+    footerImageHeightMm: r.footer_image_height_mm ?? undefined,
     isActive: r.is_active ?? true,
   }
 }

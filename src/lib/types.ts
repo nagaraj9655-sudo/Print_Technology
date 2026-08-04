@@ -57,6 +57,9 @@ export interface Company {
   defaultGstMode?: GstMode // default tax mode preselected when billing this company
   defaultBillType?: BillType // default Online / Handbill preselected for this company
   defaultSimpleBill?: boolean // default to a plain/cash bill (no balance/received shown)
+  footerImageDataUrl?: string // optional footer image printed at the bottom of bills & quotes (data URL)
+  footerImageWidthMm?: number // footer image display width in mm (default: full width ~190mm)
+  footerImageHeightMm?: number // footer image display height in mm (default: auto / proportional)
   isActive: boolean
 }
 

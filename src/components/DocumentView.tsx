@@ -343,6 +343,18 @@ function PaymentInfo({ ctx }: { ctx: Ctx }) {
   )
 }
 
+function FooterImage({ ctx }: { ctx: Ctx }) {
+  const { company } = ctx
+  if (!company?.footerImageDataUrl) return null
+  const w = company.footerImageWidthMm ?? 190
+  const h = company.footerImageHeightMm
+  return (
+    <div className="mt-3 flex justify-center">
+      <img src={company.footerImageDataUrl} alt="" style={{ width: `${w}mm`, height: h ? `${h}mm` : 'auto' }} className="object-contain" />
+    </div>
+  )
+}
+
 /* ================================================================== */
 /* TEMPLATE 1 — MODERN (accent band header, sans, filled net box)      */
 /* ================================================================== */
@@ -379,6 +391,7 @@ function ModernTemplate({ ctx }: { ctx: Ctx }) {
       {isBill && <AmountWords amount={ctx.t.net} />}
       <ModernFooter ctx={ctx} />
       <p className="mt-4 text-center text-[10px] text-slate-600">{settings.invoiceFooter}</p>
+      <FooterImage ctx={ctx} />
     </div>
   )
 }
@@ -440,6 +453,7 @@ function ClassicTemplate({ ctx }: { ctx: Ctx }) {
         <div className="flex items-end justify-end gap-4"><PaymentQr ctx={ctx} /><SignatureBlock ctx={ctx} /></div>
       </div>
       <p className="mt-4 text-center text-[10px] italic text-slate-600">{settings.invoiceFooter}</p>
+      <FooterImage ctx={ctx} />
     </div>
   )
 }
@@ -495,6 +509,7 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
         <div className="flex items-end justify-end gap-4"><PaymentQr ctx={ctx} /><SignatureBlock ctx={ctx} /></div>
       </div>
       <p className="mt-4 text-[10px] text-slate-600">{settings.invoiceFooter}</p>
+      <FooterImage ctx={ctx} />
     </div>
   )
 }
@@ -545,6 +560,7 @@ function ElegantTemplate({ ctx }: { ctx: Ctx }) {
         <div className="flex items-end justify-end gap-4"><PaymentQr ctx={ctx} /><SignatureBlock ctx={ctx} /></div>
       </div>
       <p className="mt-3 text-center text-[10px] tracking-wide text-slate-600">{settings.invoiceFooter}</p>
+      <FooterImage ctx={ctx} />
     </div>
   )
 }
@@ -597,6 +613,7 @@ function BoldTemplate({ ctx }: { ctx: Ctx }) {
         <div className="flex items-end justify-end gap-4"><PaymentQr ctx={ctx} /><SignatureBlock ctx={ctx} /></div>
       </div>
       <p className="mt-4 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-600">{settings.invoiceFooter}</p>
+      <FooterImage ctx={ctx} />
     </div>
   )
 }
@@ -670,6 +687,7 @@ function GridTemplate({ ctx }: { ctx: Ctx }) {
         <div className="flex items-end justify-end gap-4"><PaymentQr ctx={ctx} /><SignatureBlock ctx={ctx} /></div>
       </div>
       <p className="mt-3 text-center text-[10px] text-slate-600">{settings.invoiceFooter}</p>
+      <FooterImage ctx={ctx} />
     </div>
   )
 }

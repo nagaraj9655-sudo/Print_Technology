@@ -364,6 +364,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         defaultGstMode: c.defaultGstMode,
         defaultBillType: c.defaultBillType,
         defaultSimpleBill: c.defaultSimpleBill,
+        footerImageDataUrl: c.footerImageDataUrl,
+        footerImageWidthMm: c.footerImageWidthMm || undefined,
+        footerImageHeightMm: c.footerImageHeightMm || undefined,
         isActive: c.isActive ?? true,
       }
       mutate((d) => {
