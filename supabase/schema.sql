@@ -84,6 +84,9 @@ alter table public.companies add column if not exists default_bill_type text;
 alter table public.companies add column if not exists signatory_name text;
 alter table public.companies add column if not exists signature_data_url text;
 alter table public.companies add column if not exists default_simple_bill boolean;
+alter table public.companies add column if not exists footer_image_data_url text;
+alter table public.companies add column if not exists footer_image_width_mm numeric;
+alter table public.companies add column if not exists footer_image_height_mm numeric;
 
 create table if not exists public.customers (
   id         uuid primary key default gen_random_uuid(),
