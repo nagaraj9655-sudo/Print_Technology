@@ -85,8 +85,15 @@ export function DocumentView(props: DocViewProps) {
   const Template = TEMPLATES[template] ?? ModernTemplate
   return (
     <div
-      className="print-page mx-auto w-full max-w-[820px] bg-white text-slate-800 shadow-card print:shadow-none"
-      style={{ fontFamily: font, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+      className="print-page mx-auto bg-white text-slate-800 print:shadow-none"
+      style={{
+        fontFamily: font,
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact',
+        width: '210mm',
+        minHeight: '297mm',
+        boxSizing: 'border-box'
+      }}
     >
       <Template ctx={ctx} />
     </div>
