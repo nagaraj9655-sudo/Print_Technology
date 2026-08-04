@@ -251,6 +251,13 @@ function CompanyModal({
           </select>
         </div>
         <div>
+          <label className="label">Default bill format</label>
+          <select className="input" value={form.defaultSimpleBill ? 'simple' : 'standard'} onChange={(e) => set({ defaultSimpleBill: e.target.value === 'simple' })}>
+            <option value="standard">Standard — with received / balance</option>
+            <option value="simple">Simple (cash) — no balance shown</option>
+          </select>
+        </div>
+        <div>
           <label className="label">Invoice prefix</label>
           <input className="input font-mono" value={form.invoicePrefix ?? ''} onChange={(e) => set({ invoicePrefix: e.target.value })} placeholder="PT/" />
         </div>

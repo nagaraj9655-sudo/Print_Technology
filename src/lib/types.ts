@@ -56,6 +56,7 @@ export interface Company {
   handbooks?: Handbook[] // manual bill books configured for this company
   defaultGstMode?: GstMode // default tax mode preselected when billing this company
   defaultBillType?: BillType // default Online / Handbill preselected for this company
+  defaultSimpleBill?: boolean // default to a plain/cash bill (no balance/received shown)
   isActive: boolean
 }
 
@@ -117,6 +118,7 @@ export interface Bill {
   gstInclusive?: boolean // when GST on: true = entered rates already include GST (extract it)
   originalCost?: number // whole-document manual cost — NEVER printed; profit report only
   billType?: BillType // Online (system-numbered) | Handbill (manual paper book)
+  simpleBill?: boolean // true = plain/cash bill: no received/balance/payment shown, treated as paid
   handbookId?: ID // which manual book (Handbill)
   handBookNo?: string // editable book number on the receipt (Handbill)
   handBillNo?: string // editable receipt/bill number within the book (Handbill)

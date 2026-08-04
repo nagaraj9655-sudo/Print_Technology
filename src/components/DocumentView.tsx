@@ -55,6 +55,7 @@ interface Ctx {
   topMm: number
   inclusive: boolean
   template: DocTemplate
+  simpleBill: boolean
 }
 
 export function DocumentView(props: DocViewProps) {
@@ -75,8 +76,9 @@ export function DocumentView(props: DocViewProps) {
   const topMm = (isBill ? settings.letterpadBillTopMm : settings.letterpadQuoteTopMm) ?? 40
   const inclusive = gst && !!doc.gstInclusive
   const template: DocTemplate = company?.template ?? 'modern'
+  const simpleBill = isBill && !!(doc as Bill).simpleBill
 
-  const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, topMm, inclusive, template }
+  const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, topMm, inclusive, template, simpleBill }
 
   const font = company?.fontFamily ? fontStack(company.fontFamily) || templateFont(template) : templateFont(template)
 
@@ -142,8 +144,8 @@ function Stamp({ ctx }: { ctx: Ctx }) {
 
 // ---- Net payable box: distinct per template ----
 function NetBox({ ctx }: { ctx: Ctx }) {
-  const { t, accent, isBill, template } = ctx
-  const label = isBill ? 'Net Payable' : 'Grand Total'
+  const { t, accent, isBill, template, simpleBill } = ctx
+  const label = isBill ? (simpleBill ? 'Total' : 'Net Payable') : 'Grand Total'
   const val = formatINR(t.net)
   switch (template) {
     case 'modern':
@@ -216,12 +218,12 @@ function TotalsRows({ ctx }: { ctx: Ctx }) {
 
 // Totals column used by most templates (breakup rows + net box + received/balance).
 function TotalsColumn({ ctx, boxed }: { ctx: Ctx; boxed?: boolean }) {
-  const { isBill, t } = ctx
+  const { isBill, t, simpleBill } = ctx
   return (
     <div className={`w-72 text-sm ${boxed ? 'rounded-lg border border-slate-300 p-3' : ''}`}>
       <TotalsRows ctx={ctx} />
       <NetBox ctx={ctx} />
-      {isBill && (
+      {isBill && !simpleBill && (
         <>
           <TotalRow label="Received" value={formatINR(t.received)} />
           <TotalRow label="Balance Due" value={formatINR(t.balance)} strong />
@@ -289,7 +291,7 @@ function MetaCol({ ctx }: { ctx: Ctx }) {
       <Meta label="Date" value={formatDate(doc.date)} />
       {validUntil && <Meta label="Valid Until" value={formatDate(validUntil)} />}
       {gst && <Meta label="Supply" value={interState ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'} />}
-      {isBill && <div className="flex justify-end pt-1"><Stamp ctx={{ ...ctx, t }} /></div>}
+      {isBill && !ctx.simpleBill && <div className="flex justify-end pt-1"><Stamp ctx={{ ...ctx, t }} /></div>}
     </div>
   )
 }
@@ -312,8 +314,8 @@ function SignatureBlock({ ctx, align = 'right' }: { ctx: Ctx; align?: 'right' | 
 }
 
 function PaymentQr({ ctx, size = 90 }: { ctx: Ctx; size?: number }) {
-  const { company, isBill, t, docNo } = ctx
-  if (!(isBill && company?.upiId && t.balance > 0.001)) return null
+  const { company, isBill, t, docNo, simpleBill } = ctx
+  if (simpleBill || !(isBill && company?.upiId && t.balance > 0.001)) return null
   return (
     <div className="text-center">
       <UpiQr upiId={company.upiId} payeeName={company.payeeName || company.name} amount={t.balance} note={docNo} size={size} className="rounded border border-slate-300" />
@@ -477,7 +479,7 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
 
       <div className="mt-5 flex items-start justify-between text-sm">
         <BillTo ctx={ctx} />
-        {isBill && <Stamp ctx={ctx} />}
+        {isBill && !ctx.simpleBill && <Stamp ctx={ctx} />}
         {validUntil && <p className="text-xs text-slate-700">Valid until {formatDate(validUntil)}</p>}
       </div>
 
@@ -623,7 +625,7 @@ function GridTemplate({ ctx }: { ctx: Ctx }) {
               <div className="flex justify-between"><span className="text-slate-600">Date</span><span className="text-slate-800">{formatDate(doc.date)}</span></div>
               {validUntil && <div className="flex justify-between"><span className="text-slate-600">Valid Until</span><span className="text-slate-800">{formatDate(validUntil)}</span></div>}
               {gst && <div className="flex justify-between"><span className="text-slate-600">Supply</span><span className="text-slate-800">{interState ? 'IGST' : 'CGST+SGST'}</span></div>}
-              {isBill && <div className="mt-1 flex justify-end"><Stamp ctx={ctx} /></div>}
+              {isBill && !ctx.simpleBill && <div className="mt-1 flex justify-end"><Stamp ctx={ctx} /></div>}
             </div>
           </div>
           <BillTo ctx={ctx} className="border-t px-3 py-2" />
@@ -654,7 +656,7 @@ function GridTemplate({ ctx }: { ctx: Ctx }) {
         <div className="w-72 border-2 border-t-0 text-sm" style={{ borderColor: accent }}>
           <div className="px-3 py-2"><TotalsRows ctx={ctx} /></div>
           <NetBox ctx={ctx} />
-          {isBill && (
+          {isBill && !ctx.simpleBill && (
             <div className="px-3 py-2">
               <TotalRow label="Received" value={formatINR(t.received)} />
               <TotalRow label="Balance Due" value={formatINR(t.balance)} strong />

@@ -24,6 +24,7 @@ function companyToRow(c: Company) {
     accent: c.accent ?? null, accent2: c.accent2 ?? null, template: c.template ?? null,
     font_family: c.fontFamily ?? null, terms: c.terms ?? null, handbooks: c.handbooks ?? [],
     default_gst_mode: c.defaultGstMode ?? null, default_bill_type: c.defaultBillType ?? null,
+    default_simple_bill: c.defaultSimpleBill ?? null,
     is_active: c.isActive, updated_at: new Date().toISOString(),
   }
 }
@@ -37,6 +38,7 @@ function rowToCompany(r: any): Company {
     accent: r.accent ?? undefined, accent2: r.accent2 ?? undefined, template: r.template ?? undefined,
     fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, handbooks: r.handbooks ?? [],
     defaultGstMode: r.default_gst_mode ?? undefined, defaultBillType: r.default_bill_type ?? undefined,
+    defaultSimpleBill: r.default_simple_bill ?? undefined,
     isActive: r.is_active ?? true,
   }
 }
@@ -54,7 +56,7 @@ function billToRow(b: Bill) {
     customer_type: b.customerType, customer_id: b.customerId ?? null, customer_name: b.customerName,
     customer_address: b.customerAddress, customer_phone: b.customerPhone, customer_gstin: b.customerGstin ?? null,
     items: b.items, discount_amount: b.discountAmount, discount_is_percent: b.discountIsPercent ?? false,
-    gst_enabled: b.gstEnabled ?? null, gst_inclusive: b.gstInclusive ?? null, original_cost: b.originalCost ?? null, bill_type: b.billType ?? 'Online',
+    gst_enabled: b.gstEnabled ?? null, gst_inclusive: b.gstInclusive ?? null, simple_bill: b.simpleBill ?? null, original_cost: b.originalCost ?? null, bill_type: b.billType ?? 'Online',
     handbook_id: b.handbookId ?? null, hand_book_no: b.handBookNo ?? null, hand_bill_no: b.handBillNo ?? null,
     received_amount: b.receivedAmount, payments: b.payments, doc_status: b.docStatus,
     created_by: b.createdBy, created_at: b.createdAt, updated_at: b.updatedAt, deleted_at: b.deletedAt ?? null,
@@ -66,7 +68,7 @@ function rowToBill(r: any): Bill {
     customerType: r.customer_type, customerId: r.customer_id ?? undefined, customerName: r.customer_name ?? '',
     customerAddress: r.customer_address ?? '', customerPhone: r.customer_phone ?? '', customerGstin: r.customer_gstin ?? undefined,
     items: r.items ?? [], discountAmount: Number(r.discount_amount) || 0, discountIsPercent: r.discount_is_percent ?? false,
-    gstEnabled: r.gst_enabled ?? undefined, gstInclusive: r.gst_inclusive ?? undefined, originalCost: r.original_cost ?? undefined, billType: r.bill_type ?? 'Online',
+    gstEnabled: r.gst_enabled ?? undefined, gstInclusive: r.gst_inclusive ?? undefined, simpleBill: r.simple_bill ?? undefined, originalCost: r.original_cost ?? undefined, billType: r.bill_type ?? 'Online',
     handbookId: r.handbook_id ?? undefined, handBookNo: r.hand_book_no ?? undefined, handBillNo: r.hand_bill_no ?? undefined,
     receivedAmount: Number(r.received_amount) || 0, payments: r.payments ?? [], docStatus: r.doc_status,
     createdBy: r.created_by ?? '', createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at ?? undefined,

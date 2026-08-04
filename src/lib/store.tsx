@@ -99,6 +99,7 @@ export interface BillDraft {
   gstInclusive?: boolean
   originalCost?: number
   billType?: Bill['billType']
+  simpleBill?: boolean
   handbookId?: string
   handBookNo?: string
   handBillNo?: string
@@ -362,6 +363,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         handbooks: c.handbooks ?? [],
         defaultGstMode: c.defaultGstMode,
         defaultBillType: c.defaultBillType,
+        defaultSimpleBill: c.defaultSimpleBill,
         isActive: c.isActive ?? true,
       }
       mutate((d) => {
@@ -432,6 +434,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     gstInclusive: draft.gstInclusive,
     originalCost: draft.originalCost,
     billType: draft.billType ?? 'Online',
+    simpleBill: draft.simpleBill,
     handbookId: draft.handbookId,
     handBookNo: draft.handBookNo,
     handBillNo: draft.handBillNo,

@@ -57,6 +57,8 @@ export default function BillForm() {
   const [taxMode, setTaxMode] = useState<GstMode>(initialTaxMode)
   // Online (system-numbered) vs Handbill (manual paper book).
   const [billType, setBillType] = useState<BillType>(existing?.billType ?? initialCompany?.defaultBillType ?? 'Online')
+  // Standard bill (with received/balance) vs Simple/cash bill (no payment shown, treated as paid).
+  const [simpleBill, setSimpleBill] = useState(existing?.simpleBill ?? initialCompany?.defaultSimpleBill ?? false)
   const [handbookId, setHandbookId] = useState(existing?.handbookId ?? '')
   const [handBookNo, setHandBookNo] = useState(existing?.handBookNo ?? '')
   const [handBillNo, setHandBillNo] = useState(existing?.handBillNo ?? '')
@@ -85,6 +87,7 @@ export default function BillForm() {
     const c = db.companies.find((x) => x.id === companyId)
     setTaxMode(c?.defaultGstMode ?? 'exclusive')
     setBillType(c?.defaultBillType ?? 'Online')
+    setSimpleBill(c?.defaultSimpleBill ?? false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId])
 
@@ -152,7 +155,8 @@ export default function BillForm() {
     items: items.filter((i) => i.description.trim()),
     discountAmount,
     discountIsPercent,
-    receivedAmount,
+    simpleBill,
+    receivedAmount: simpleBill ? totals.net : receivedAmount, // simple/cash bill = fully paid
     gstEnabled: companyIsGst ? gstEnabled : false,
     gstInclusive: companyIsGst && gstEnabled ? gstInclusive : false,
     originalCost: originalCost || undefined,
@@ -244,6 +248,22 @@ export default function BillForm() {
                   <button type="button" onClick={() => setBillType('Handbill')}
                     className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium ${billType === 'Handbill' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
                     <BookOpen className="h-4 w-4" /> Handbill
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Bill format</label>
+                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-sm">
+                  <button type="button" onClick={() => setSimpleBill(false)}
+                    className={`rounded-md px-3 py-1.5 font-medium ${!simpleBill ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                    title="Shows received, balance and payment tracking">
+                    Standard
+                  </button>
+                  <button type="button" onClick={() => setSimpleBill(true)}
+                    className={`rounded-md px-3 py-1.5 font-medium ${simpleBill ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                    title="Plain cash bill — no balance / received / payment shown">
+                    Simple (cash)
                   </button>
                 </div>
               </div>
@@ -395,39 +415,47 @@ export default function BillForm() {
                 </>
               )}
               <div className="border-t border-slate-100 pt-2">
-                <Row label="Net Payable" value={formatINR(totals.net)} strong />
+                <Row label={simpleBill ? 'Total' : 'Net Payable'} value={formatINR(totals.net)} strong />
               </div>
 
-              <div>
-                <label className="label">Received amount</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  className="input text-right tnum"
-                  value={receivedAmount}
-                  onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
-                  disabled={!!existing && existing.payments.length > 0}
-                />
-                {!!existing && existing.payments.length > 0 && (
-                  <p className="mt-1 text-xs text-slate-400">Use “Record Payment” on the bill to add more.</p>
-                )}
-              </div>
-              <Row label="Balance Due" value={formatINR(totals.balance)} />
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Status</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    totals.status === 'Paid'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : totals.status === 'Partial'
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-red-50 text-red-700'
-                  }`}
-                >
-                  {totals.status}
-                </span>
-              </div>
+              {simpleBill ? (
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  Simple/cash bill — no received, balance or payment tracking is shown or printed. The full amount is treated as paid.
+                </p>
+              ) : (
+                <>
+                  <div>
+                    <label className="label">Received amount</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      className="input text-right tnum"
+                      value={receivedAmount}
+                      onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
+                      disabled={!!existing && existing.payments.length > 0}
+                    />
+                    {!!existing && existing.payments.length > 0 && (
+                      <p className="mt-1 text-xs text-slate-400">Use “Record Payment” on the bill to add more.</p>
+                    )}
+                  </div>
+                  <Row label="Balance Due" value={formatINR(totals.balance)} />
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Status</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        totals.status === 'Paid'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : totals.status === 'Partial'
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-red-50 text-red-700'
+                      }`}
+                    >
+                      {totals.status}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="mt-5 space-y-2">

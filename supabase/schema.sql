@@ -62,6 +62,7 @@ create table if not exists public.companies (
   payee_name     text,
   signatory_name text,
   signature_data_url text,
+  default_simple_bill boolean,
   upi_id         text,
   payee_name     text,
   invoice_prefix text,
@@ -82,8 +83,7 @@ alter table public.companies add column if not exists default_gst_mode text;
 alter table public.companies add column if not exists default_bill_type text;
 alter table public.companies add column if not exists signatory_name text;
 alter table public.companies add column if not exists signature_data_url text;
-alter table public.companies add column if not exists upi_id text;
-alter table public.companies add column if not exists payee_name text;
+alter table public.companies add column if not exists default_simple_bill boolean;
 
 create table if not exists public.customers (
   id         uuid primary key default gen_random_uuid(),
@@ -112,6 +112,7 @@ create table if not exists public.bills (
   discount_is_percent boolean default false,
   gst_enabled         boolean,
   gst_inclusive       boolean,
+  simple_bill         boolean,
   original_cost       numeric,
   bill_type           text default 'Online',
   handbook_id         uuid,
@@ -169,6 +170,7 @@ create table if not exists public.counters (
 
 -- Upgrade-safe columns for existing projects
 alter table public.bills add column if not exists gst_inclusive boolean;
+alter table public.bills add column if not exists simple_bill boolean;
 alter table public.quotations add column if not exists gst_inclusive boolean;
 
 -- ---------- Row-level security ----------------------------------------------

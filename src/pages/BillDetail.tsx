@@ -121,32 +121,42 @@ export default function BillDetail() {
 
         {/* Side panel: payment history */}
         <div className="no-print space-y-4">
-          <div className="card p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-slate-500">Net Payable</dt><dd className="font-semibold tnum">{formatINR(t.net)}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Received</dt><dd className="tnum text-emerald-600">{formatINR(t.received)}</dd></div>
-              <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="text-slate-500">Balance Due</dt><dd className={`font-bold tnum ${t.balance > 0 ? 'text-red-600' : 'text-slate-700'}`}>{formatINR(t.balance)}</dd></div>
-            </dl>
-          </div>
+          {bill.simpleBill ? (
+            <div className="card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">Simple (cash) bill</h3>
+              <div className="flex justify-between text-sm"><span className="text-slate-500">Total</span><span className="font-bold tnum">{formatINR(t.net)}</span></div>
+              <p className="mt-2 text-xs text-slate-400">No balance, received amount or payment history is tracked or printed for this bill.</p>
+            </div>
+          ) : (
+            <>
+              <div className="card p-4">
+                <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between"><dt className="text-slate-500">Net Payable</dt><dd className="font-semibold tnum">{formatINR(t.net)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">Received</dt><dd className="tnum text-emerald-600">{formatINR(t.received)}</dd></div>
+                  <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="text-slate-500">Balance Due</dt><dd className={`font-bold tnum ${t.balance > 0 ? 'text-red-600' : 'text-slate-700'}`}>{formatINR(t.balance)}</dd></div>
+                </dl>
+              </div>
 
-          <div className="card p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment history</h3>
-            {bill.payments.length === 0 ? (
-              <p className="text-sm text-slate-400">No payments recorded.</p>
-            ) : (
-              <ul className="space-y-2">
-                {bill.payments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                    <div>
-                      <p className="font-medium text-slate-700 tnum">{formatINR(p.amount)}</p>
-                      <p className="text-xs text-slate-400">{formatDate(p.date)} · {p.mode || '—'}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+              <div className="card p-4">
+                <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment history</h3>
+                {bill.payments.length === 0 ? (
+                  <p className="text-sm text-slate-400">No payments recorded.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {bill.payments.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium text-slate-700 tnum">{formatINR(p.amount)}</p>
+                          <p className="text-xs text-slate-400">{formatDate(p.date)} · {p.mode || '—'}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="card p-4 text-xs text-slate-400">
             <p>Global Bill No: <span className="font-medium text-slate-600">{bill.billNo || '—'}</span></p>
