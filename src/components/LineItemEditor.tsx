@@ -1,8 +1,10 @@
+import { useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { LineItem } from '../lib/types'
 import { formatINR } from '../lib/format'
 import { lineTotal } from '../lib/calc'
 import { uid } from '../lib/db'
+import { useStore } from '../lib/store'
 
 interface Props {
   items: LineItem[]
@@ -14,6 +16,15 @@ interface Props {
 }
 
 export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxRate, showCost = false }: Props) {
+  const { db } = useStore()
+  
+  const pastDescriptions = useMemo(() => {
+    const set = new Set<string>()
+    db.bills.forEach(b => b.items.forEach(i => i.description && set.add(i.description.trim())))
+    db.quotations.forEach(q => q.items.forEach(i => i.description && set.add(i.description.trim())))
+    return Array.from(set).filter(Boolean).sort()
+  }, [db.bills, db.quotations])
+
   const update = (id: string, patch: Partial<LineItem>) =>
     onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
 
@@ -38,6 +49,11 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200">
+      <datalist id="past-descriptions">
+        {pastDescriptions.map((desc) => (
+          <option key={desc} value={desc} />
+        ))}
+      </datalist>
       <table className="w-full">
         <thead className="bg-slate-50">
           <tr>
@@ -61,6 +77,7 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
                 <td className="td">
                   <input
                     className="input"
+                    list="past-descriptions"
                     value={it.description}
                     placeholder="Service / item description"
                     onChange={(e) => update(it.id, { description: e.target.value })}
