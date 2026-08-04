@@ -194,6 +194,14 @@ function CompanyModal({
     reader.readAsDataURL(file)
   }
 
+  const onSignature = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => set({ signatureDataUrl: reader.result as string })
+    reader.readAsDataURL(file)
+  }
+
   return (
     <Modal open onClose={onClose} title={company ? 'Edit company' : 'Add company'} size="lg">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -269,14 +277,18 @@ function CompanyModal({
         <div>
           <label className="label">Document template</label>
           <select className="input" value={form.template ?? 'modern'} onChange={(e) => set({ template: e.target.value as Company['template'] })}>
-            <option value="modern">Modern — bold coloured bands</option>
-            <option value="classic">Classic — centered, serif, ruled</option>
-            <option value="minimal">Minimal — clean accent edge</option>
+            <option value="modern">Modern — accent band, sans</option>
+            <option value="classic">Classic — centered serif, double rule</option>
+            <option value="minimal">Minimal — thin accent edge</option>
+            <option value="elegant">Elegant — framed, Playfair serif</option>
+            <option value="bold">Bold — heavy slab, thick rules</option>
+            <option value="grid">Grid — bordered GST-style cells</option>
           </select>
         </div>
         <div>
           <label className="label">Document font</label>
-          <select className="input" value={form.fontFamily ?? 'Inter'} onChange={(e) => set({ fontFamily: e.target.value })}>
+          <select className="input" value={form.fontFamily ?? ''} onChange={(e) => set({ fontFamily: e.target.value || undefined })}>
+            <option value="">Auto (match template)</option>
             <option value="Inter">Inter (sans)</option>
             <option value="Poppins">Poppins (sans)</option>
             <option value="Roboto Slab">Roboto Slab (slab)</option>
@@ -298,10 +310,25 @@ function CompanyModal({
             <input className="input font-mono" value={form.accent2 ?? ''} onChange={(e) => set({ accent2: e.target.value })} />
           </div>
         </div>
-        <div className="sm:col-span-2">
+        <div>
           <label className="label">Logo</label>
           <input type="file" accept="image/*" className="text-xs text-slate-500" onChange={onLogo} />
           {form.logoDataUrl && <img src={form.logoDataUrl} alt="" className="mt-2 h-12 rounded object-contain" />}
+        </div>
+        <div>
+          <label className="label">Authorised signatory name</label>
+          <input className="input" value={form.signatoryName ?? ''} onChange={(e) => set({ signatoryName: e.target.value })} placeholder="e.g. R. Nagaraj, Proprietor" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Digital signature (image)</label>
+          <input type="file" accept="image/*" className="text-xs text-slate-500" onChange={onSignature} />
+          {form.signatureDataUrl && (
+            <div className="mt-2 flex items-center gap-2">
+              <img src={form.signatureDataUrl} alt="signature" className="h-12 rounded border border-slate-200 bg-white object-contain px-1" />
+              <button type="button" className="text-xs text-red-500 hover:underline" onClick={() => set({ signatureDataUrl: undefined })}>Remove</button>
+            </div>
+          )}
+          <p className="mt-1 text-xs text-slate-400">Printed above the signatory name on bills &amp; quotes. Use a transparent PNG for best results.</p>
         </div>
       </div>
 

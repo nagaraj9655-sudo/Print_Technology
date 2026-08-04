@@ -12,7 +12,20 @@ import type {
 import { load, save, resetDatabase, uid, emptyDatabase } from './db'
 import { commitBillNumbers, commitQuoteNumbers } from './numbering'
 import { billTotals } from './calc'
-import { todayISO } from './format'
+import { financialYear, todayISO } from './format'
+
+// Parse the trailing number from an edited doc number and set the per-company/FY
+// counter so the NEXT auto number is (edited + 1). e.g. "PT/2026-27/008" -> seq 8.
+function reconcileSeq(d: Database, kind: 'bill' | 'quote', companyId: string, dateISO: string, edited: string) {
+  const m = edited.match(/(\d+)\s*$/)
+  if (!m) return
+  const seq = parseInt(m[1], 10)
+  if (!Number.isFinite(seq)) return
+  const fy = financialYear(dateISO, d.settings.fyStartMonth)
+  const key = `${companyId}:${fy}`
+  const map = kind === 'bill' ? d.counters.companyBillSeq : d.counters.companyQuoteSeq
+  map[key] = seq
+}
 import { isSupabaseConfigured, supabase } from './supabase'
 import * as remote from './remote'
 
@@ -89,6 +102,7 @@ export interface BillDraft {
   handbookId?: string
   handBookNo?: string
   handBillNo?: string
+  companyBillNoOverride?: string // user-edited invoice number; resets the series to +1
 }
 
 export interface QuoteDraft {
@@ -108,6 +122,7 @@ export interface QuoteDraft {
   gstEnabled?: boolean
   gstInclusive?: boolean
   originalCost?: number
+  companyQuoteNoOverride?: string // user-edited quote number; resets the series to +1
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -335,12 +350,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         bankDetails: c.bankDetails,
         upiId: c.upiId?.trim() || undefined,
         payeeName: c.payeeName,
+        signatoryName: c.signatoryName,
+        signatureDataUrl: c.signatureDataUrl,
         invoicePrefix: c.invoicePrefix,
         quotePrefix: c.quotePrefix,
         accent: c.accent || '#1f47f5',
         accent2: c.accent2 || c.accent || '#1f47f5',
         template: c.template ?? 'modern',
-        fontFamily: c.fontFamily ?? 'Inter',
+        fontFamily: c.fontFamily || undefined,
         terms: c.terms,
         handbooks: c.handbooks ?? [],
         defaultGstMode: c.defaultGstMode,
@@ -437,6 +454,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         companyBillNo: `${draft.handBookNo || '?'}/${draft.handBillNo || '?'}`,
       }
     }
+    // Editable invoice number: use exactly what the user set and reseed the series to +1.
+    const override = draft.companyBillNoOverride?.trim()
+    if (override) {
+      reconcileSeq(d, 'bill', draft.companyId, draft.date, override)
+      return { billNo: (d.counters.billNo = (d.counters.billNo || 0) + 1), companyBillNo: override }
+    }
     return commitBillNumbers(d, draft.companyId, draft.date)
   }
 
@@ -481,6 +504,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         } else if (draft.billType === 'Handbill' && prev.docStatus === 'Finalized') {
           // Handbill book/receipt numbers stay editable after finalize.
           companyBillNo = `${draft.handBookNo || '?'}/${draft.handBillNo || '?'}`
+        } else if (prev.docStatus === 'Finalized' && draft.companyBillNoOverride?.trim()) {
+          // Editable invoice number on an already-finalized bill.
+          companyBillNo = draft.companyBillNoOverride.trim()
+          reconcileSeq(d, 'bill', draft.companyId, draft.date, companyBillNo)
         }
         updated = {
           ...prev,
@@ -562,7 +589,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (draft) => {
       let created!: Quotation
       mutate((d) => {
-        const nums = commitQuoteNumbers(d, draft.companyId, draft.date)
+        const override = draft.companyQuoteNoOverride?.trim()
+        let nums: { quoteNo: number; companyQuoteNo: string }
+        if (override) {
+          reconcileSeq(d, 'quote', draft.companyId, draft.date, override)
+          nums = { quoteNo: (d.counters.quoteNo = (d.counters.quoteNo || 0) + 1), companyQuoteNo: override }
+        } else {
+          nums = commitQuoteNumbers(d, draft.companyId, draft.date)
+        }
         created = {
           id: uid(),
           quoteNo: nums.quoteNo,
@@ -620,6 +654,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           status: draft.status,
           validUntil: draft.validUntil,
           updatedAt: new Date().toISOString(),
+        }
+        const override = draft.companyQuoteNoOverride?.trim()
+        if (override && override !== prev.companyQuoteNo) {
+          updated.companyQuoteNo = override
+          reconcileSeq(d, 'quote', draft.companyId, draft.date, override)
         }
         d.quotations[idx] = updated
       })

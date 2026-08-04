@@ -46,6 +46,7 @@ export default function QuoteForm() {
   const [taxMode, setTaxMode] = useState<GstMode>(initialTaxMode)
   const [showLineCost, setShowLineCost] = useState(existing?.items.some((i) => i.cost != null) ?? false)
   const [originalCost, setOriginalCost] = useState(existing?.originalCost ?? 0)
+  const [quoteNoField, setQuoteNoField] = useState(existing?.companyQuoteNo ?? '')
 
   const company = db.companies.find((c) => c.id === companyId)
   const companyIsGst = isGstCompany(company)
@@ -61,6 +62,12 @@ export default function QuoteForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId])
 
+  useEffect(() => {
+    if (existing) return
+    setQuoteNoField(nextQuoteNumbers(db, companyId, date).companyQuoteNo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, date])
+
   const totals = useMemo(
     () => computeTotals({ items, discountAmount, discountIsPercent, company, interState: recipientInterState(company, customer.customerGstin), gstEnabled, gstInclusive }),
     [items, discountAmount, discountIsPercent, company, customer.customerGstin, gstEnabled, gstInclusive],
@@ -68,11 +75,6 @@ export default function QuoteForm() {
 
   const cost = costBasis(items, originalCost)
   const profit = totals.taxable - cost
-
-  const previewNumber = useMemo(
-    () => (existing ? existing.companyQuoteNo : nextQuoteNumbers(db, companyId, date).companyQuoteNo),
-    [db, companyId, date, existing],
-  )
 
   const submit = () => {
     if (!customer.customerName.trim()) return toast('Customer name is required', 'error')
@@ -94,6 +96,7 @@ export default function QuoteForm() {
       gstEnabled: companyIsGst ? gstEnabled : false,
       gstInclusive: companyIsGst && gstEnabled ? gstInclusive : false,
       originalCost: originalCost || undefined,
+      companyQuoteNoOverride: quoteNoField.trim() || undefined,
     }
     const saved = existing ? updateQuote(existing.id, draft) : createQuote(draft)
     toast('Quotation saved')
@@ -138,8 +141,9 @@ export default function QuoteForm() {
                 </select>
               </div>
               <div className="sm:col-span-4">
-                <label className="label">Quote No</label>
-                <input className="input bg-slate-50 font-medium" value={previewNumber} readOnly />
+                <label className="label">Quote No (editable)</label>
+                <input className="input font-medium" value={quoteNoField} onChange={(e) => setQuoteNoField(e.target.value)} placeholder="PT/Q/2026-27/008" />
+                <p className="mt-1 text-xs text-slate-400">Edit if needed — the next quote continues from this +1.</p>
               </div>
             </div>
             <div className="mt-4 border-t border-slate-100 pt-4">

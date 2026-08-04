@@ -6,7 +6,8 @@ export type ID = string
 export type Role = 'Admin' | 'Operator'
 
 // Document design template — gives each company a distinct look.
-export type DocTemplate = 'modern' | 'classic' | 'minimal'
+// Six visually distinct layouts (font, header, lines, status stamp, net box all differ).
+export type DocTemplate = 'modern' | 'classic' | 'minimal' | 'elegant' | 'bold' | 'grid'
 
 export interface User {
   id: ID
@@ -43,6 +44,8 @@ export interface Company {
   bankDetails?: string // "Pay to" block
   upiId?: string // UPI / VPA for GPay / PhonePe (drives payment QR + reminders)
   payeeName?: string // name shown in the UPI app (defaults to company name)
+  signatoryName?: string // printed under the signature line
+  signatureDataUrl?: string // uploaded digital signature image (data URL)
   invoicePrefix?: string // e.g. "PT/"
   quotePrefix?: string // e.g. "PT/Q/"
   accent?: string // per-company brand accent color

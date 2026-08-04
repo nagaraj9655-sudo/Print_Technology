@@ -60,6 +60,8 @@ create table if not exists public.companies (
   bank_details   text,
   upi_id         text,
   payee_name     text,
+  signatory_name text,
+  signature_data_url text,
   upi_id         text,
   payee_name     text,
   invoice_prefix text,
@@ -78,6 +80,8 @@ alter table public.companies add column if not exists upi_id text;
 alter table public.companies add column if not exists payee_name text;
 alter table public.companies add column if not exists default_gst_mode text;
 alter table public.companies add column if not exists default_bill_type text;
+alter table public.companies add column if not exists signatory_name text;
+alter table public.companies add column if not exists signature_data_url text;
 alter table public.companies add column if not exists upi_id text;
 alter table public.companies add column if not exists payee_name text;
 

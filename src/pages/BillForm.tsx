@@ -63,6 +63,10 @@ export default function BillForm() {
   // Cost tracking for the profit report (never printed).
   const [showLineCost, setShowLineCost] = useState(existing?.items.some((i) => i.cost != null) ?? false)
   const [originalCost, setOriginalCost] = useState(existing?.originalCost ?? 0)
+  // Editable invoice number (Online bills). Next auto number becomes edited + 1.
+  const [invoiceNo, setInvoiceNo] = useState(
+    existing && existing.docStatus === 'Finalized' && existing.billType !== 'Handbill' ? existing.companyBillNo : '',
+  )
 
   const company = db.companies.find((c) => c.id === companyId)
   const companyIsGst = isGstCompany(company)
@@ -83,6 +87,14 @@ export default function BillForm() {
     setBillType(c?.defaultBillType ?? 'Online')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId])
+
+  // Keep the editable invoice number in sync with the auto series for new/draft bills.
+  useEffect(() => {
+    if (billType !== 'Online') return
+    if (existing && existing.docStatus === 'Finalized') return
+    setInvoiceNo(nextBillNumbers(db, companyId, date).companyBillNo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, date, billType])
 
   const totals = useMemo(
     () =>
@@ -148,6 +160,7 @@ export default function BillForm() {
     handbookId: billType === 'Handbill' ? handbookId || undefined : undefined,
     handBookNo: billType === 'Handbill' ? handBookNo : undefined,
     handBillNo: billType === 'Handbill' ? handBillNo : undefined,
+    companyBillNoOverride: billType === 'Online' ? invoiceNo.trim() || undefined : undefined,
   })
 
   const persistCustomerIfNeeded = () => {
@@ -209,8 +222,13 @@ export default function BillForm() {
                 <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
               <div>
-                <label className="label">{billType === 'Handbill' ? 'Book / Bill No' : `Invoice No ${existing?.docStatus === 'Finalized' ? '' : '(on finalize)'}`}</label>
-                <input className="input bg-slate-50 font-medium" value={previewNumber} readOnly />
+                <label className="label">{billType === 'Handbill' ? 'Book / Bill No' : 'Invoice No (editable)'}</label>
+                {billType === 'Handbill' ? (
+                  <input className="input bg-slate-50 font-medium" value={previewNumber} readOnly />
+                ) : (
+                  <input className="input font-medium" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="PT/2026-27/008" />
+                )}
+                {billType === 'Online' && <p className="mt-1 text-xs text-slate-400">Edit if needed — the next bill continues from this +1.</p>}
               </div>
             </div>
 
