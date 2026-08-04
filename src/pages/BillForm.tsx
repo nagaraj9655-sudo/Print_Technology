@@ -155,8 +155,8 @@ export default function BillForm() {
     items: items.filter((i) => i.description.trim()),
     discountAmount,
     discountIsPercent,
-    simpleBill,
-    receivedAmount: simpleBill ? totals.net : receivedAmount, // simple/cash bill = fully paid
+    simpleBill, // print flag only — payments/balance are tracked in the app as usual
+    receivedAmount,
     gstEnabled: companyIsGst ? gstEnabled : false,
     gstInclusive: companyIsGst && gstEnabled ? gstInclusive : false,
     originalCost: originalCost || undefined,
@@ -417,44 +417,40 @@ export default function BillForm() {
               <div className="border-t border-slate-100 pt-2">
                 <Row label={simpleBill ? 'Total' : 'Net Payable'} value={formatINR(totals.net)} strong />
               </div>
-
-              {simpleBill ? (
-                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                  Simple/cash bill — no received, balance or payment tracking is shown or printed. The full amount is treated as paid.
+              <div>
+                <label className="label">Received amount</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  className="input text-right tnum"
+                  value={receivedAmount}
+                  onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
+                  disabled={!!existing && existing.payments.length > 0}
+                />
+                {!!existing && existing.payments.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-400">Use “Record Payment” on the bill to add more.</p>
+                )}
+              </div>
+              <Row label="Balance Due" value={formatINR(totals.balance)} />
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Status</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    totals.status === 'Paid'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : totals.status === 'Partial'
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  {totals.status}
+                </span>
+              </div>
+              {simpleBill && (
+                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600">
+                  Simple bill — payment details are tracked here but not printed on the bill.
                 </p>
-              ) : (
-                <>
-                  <div>
-                    <label className="label">Received amount</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="input text-right tnum"
-                      value={receivedAmount}
-                      onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
-                      disabled={!!existing && existing.payments.length > 0}
-                    />
-                    {!!existing && existing.payments.length > 0 && (
-                      <p className="mt-1 text-xs text-slate-400">Use “Record Payment” on the bill to add more.</p>
-                    )}
-                  </div>
-                  <Row label="Balance Due" value={formatINR(totals.balance)} />
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Status</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        totals.status === 'Paid'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : totals.status === 'Partial'
-                            ? 'bg-amber-50 text-amber-700'
-                            : 'bg-red-50 text-red-700'
-                      }`}
-                    >
-                      {totals.status}
-                    </span>
-                  </div>
-                </>
               )}
             </div>
 
