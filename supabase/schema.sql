@@ -76,6 +76,8 @@ create table if not exists public.companies (
 alter table public.companies add column if not exists handbooks jsonb not null default '[]'::jsonb;
 alter table public.companies add column if not exists upi_id text;
 alter table public.companies add column if not exists payee_name text;
+alter table public.companies add column if not exists default_gst_mode text;
+alter table public.companies add column if not exists default_bill_type text;
 alter table public.companies add column if not exists upi_id text;
 alter table public.companies add column if not exists payee_name text;
 
@@ -105,6 +107,7 @@ create table if not exists public.bills (
   discount_amount     numeric not null default 0,
   discount_is_percent boolean default false,
   gst_enabled         boolean,
+  gst_inclusive       boolean,
   original_cost       numeric,
   bill_type           text default 'Online',
   handbook_id         uuid,
@@ -135,6 +138,7 @@ create table if not exists public.quotations (
   discount_amount     numeric not null default 0,
   discount_is_percent boolean default false,
   gst_enabled         boolean,
+  gst_inclusive       boolean,
   original_cost       numeric,
   status              text not null default 'Draft',
   valid_until         date,
@@ -158,6 +162,10 @@ create table if not exists public.counters (
   company_bill_seq   jsonb not null default '{}'::jsonb,
   company_quote_seq  jsonb not null default '{}'::jsonb
 );
+
+-- Upgrade-safe columns for existing projects
+alter table public.bills add column if not exists gst_inclusive boolean;
+alter table public.quotations add column if not exists gst_inclusive boolean;
 
 -- ---------- Row-level security ----------------------------------------------
 alter table public.profiles     enable row level security;

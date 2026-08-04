@@ -1,0 +1,233 @@
+import React, { useMemo, useState } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { Ionicons } from '@expo/vector-icons'
+import { useStore, type BillDraft } from '../lib/store'
+import { computeTotals, isGstCompany, recipientInterState } from '../lib/calc'
+import { formatINR, todayISO } from '../lib/format'
+import { handbookUsage } from '../lib/handbooks'
+import { uid } from '../lib/db'
+import type { Customer, LineItem } from '../lib/types'
+import { colors, font, radius, shadow, spacing } from '../theme'
+import { Button, Card, Input, SectionTitle, useToast } from '../components/ui'
+import { Select } from '../components/Select'
+import { LineItemEditor } from '../components/LineItemEditor'
+import { GradientHeader } from '../components/Header'
+import type { RootStackParamList } from '../navigation/types'
+
+type Nav = NativeStackNavigationProp<RootStackParamList>
+
+export function BillFormScreen() {
+  const nav = useNavigation<Nav>()
+  const route = useRoute<RouteProp<RootStackParamList, 'BillForm'>>()
+  const editId = route.params?.id
+  const { db, activeCompanyId, createBill, updateBill, saveCustomer } = useStore()
+  const toast = useToast()
+
+  const existing = editId ? db.bills.find((b) => b.id === editId) : undefined
+  const defaultCompany = existing?.companyId ?? (activeCompanyId !== 'ALL' ? activeCompanyId : db.companies[0]?.id) ?? ''
+
+  const [companyId, setCompanyId] = useState(defaultCompany)
+  const [date, setDate] = useState(existing?.date ?? todayISO())
+  const [customerType, setCustomerType] = useState<'Regular' | 'One_Time'>(existing?.customerType ?? 'Regular')
+  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId)
+  const [customerName, setCustomerName] = useState(existing?.customerName ?? '')
+  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? '')
+  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? '')
+  const [customerGstin, setCustomerGstin] = useState(existing?.customerGstin ?? '')
+  const [items, setItems] = useState<LineItem[]>(existing?.items ?? [{ id: uid(), description: '', qty: 1, rate: 0 }])
+  const [discountAmount, setDiscountAmount] = useState(String(existing?.discountAmount ?? ''))
+  const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
+  const [gstEnabled, setGstEnabled] = useState(existing?.gstEnabled ?? true)
+  const [receivedAmount, setReceivedAmount] = useState(String(existing?.receivedAmount ?? ''))
+  const [originalCost, setOriginalCost] = useState(existing?.originalCost != null ? String(existing.originalCost) : '')
+  const [billType, setBillType] = useState<'Online' | 'Handbill'>(existing?.billType ?? 'Online')
+  const [handbookId, setHandbookId] = useState<string | undefined>(existing?.handbookId)
+  const [handBookNo, setHandBookNo] = useState(existing?.handBookNo ?? '')
+  const [handBillNo, setHandBillNo] = useState(existing?.handBillNo ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const company = db.companies.find((c) => c.id === companyId)
+  const gstCompany = isGstCompany(company)
+  const gstMode = gstCompany && gstEnabled
+  const num = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0 }
+
+  const totals = useMemo(() => computeTotals({
+    items, discountAmount: num(discountAmount), discountIsPercent, receivedAmount: num(receivedAmount),
+    company, interState: recipientInterState(company, customerGstin), gstEnabled,
+  }), [items, discountAmount, discountIsPercent, receivedAmount, company, customerGstin, gstEnabled])
+
+  const pickCustomer = (id: string) => {
+    const c = db.customers.find((x) => x.id === id)
+    if (!c) return
+    setCustomerId(c.id); setCustomerName(c.name); setCustomerAddress(c.address); setCustomerPhone(c.phone); setCustomerGstin(c.gstin ?? '')
+  }
+
+  const handbooks = company?.handbooks ?? []
+
+  const buildDraft = (): BillDraft | null => {
+    if (!companyId) { toast('Select a company', 'error'); return null }
+    if (!customerName.trim()) { toast('Enter customer name', 'error'); return null }
+    if (items.length === 0 || items.every((it) => !it.description.trim())) { toast('Add at least one item', 'error'); return null }
+    if (billType === 'Handbill' && (!handBookNo.trim() || !handBillNo.trim())) { toast('Enter handbill book & receipt no', 'error'); return null }
+
+    // Persist a new Regular customer so it's reusable.
+    let cid = customerId
+    if (customerType === 'Regular' && !cid && customerName.trim()) {
+      const saved: Customer = saveCustomer({ name: customerName.trim(), address: customerAddress, phone: customerPhone, gstin: customerGstin })
+      cid = saved.id
+    }
+    return {
+      companyId, date, customerType, customerId: customerType === 'Regular' ? cid : undefined,
+      customerName: customerName.trim(), customerAddress, customerPhone, customerGstin,
+      items: items.filter((it) => it.description.trim()), discountAmount: num(discountAmount), discountIsPercent,
+      receivedAmount: num(receivedAmount), gstEnabled, originalCost: originalCost ? num(originalCost) : undefined,
+      billType, handbookId, handBookNo, handBillNo,
+    }
+  }
+
+  const save = (finalize: boolean) => {
+    const draft = buildDraft()
+    if (!draft) return
+    setSaving(true)
+    try {
+      const bill = editId ? updateBill(editId, draft, finalize || existing?.docStatus === 'Finalized') : createBill(draft, finalize)
+      toast(finalize ? 'Bill finalized' : 'Draft saved')
+      nav.replace('BillDetail', { id: bill.id })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <GradientHeader title={editId ? 'Edit bill' : 'New bill'} showCompany={false} onBack={() => nav.goBack()} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={90}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Card style={{ gap: 14 }}>
+            <Select label="Company" value={companyId} options={db.companies.map((c) => ({ label: c.name, value: c.id, sub: c.gstin ? 'GST' : 'Non-GST' }))} onChange={setCompanyId} />
+            <Input label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="2026-08-03" autoCapitalize="none" />
+            <View style={styles.segment}>
+              {(['Online', 'Handbill'] as const).map((bt) => (
+                <Pressable key={bt} onPress={() => setBillType(bt)} style={[styles.segmentBtn, billType === bt && styles.segmentActive]}>
+                  <Text style={[styles.segmentText, billType === bt && styles.segmentTextActive]}>{bt}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {billType === 'Handbill' && (
+              <View style={{ gap: 12 }}>
+                {handbooks.length > 0 && (
+                  <Select label="Handbook" value={handbookId} placeholder="Select book…" options={handbooks.map((h) => {
+                    const u = handbookUsage(h, db.bills)
+                    return { label: h.name, value: h.id, sub: `Book ${h.bookNo} · ${u.remaining} left${u.nextAvailable ? ` · next #${u.nextAvailable}` : ''}` }
+                  })} onChange={(id) => {
+                    setHandbookId(id)
+                    const h = handbooks.find((x) => x.id === id)
+                    if (h) { setHandBookNo(h.bookNo); const u = handbookUsage(h, db.bills); if (u.nextAvailable) setHandBillNo(String(u.nextAvailable)) }
+                  }} />
+                )}
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}><Input label="Book no" value={handBookNo} onChangeText={setHandBookNo} /></View>
+                  <View style={{ flex: 1 }}><Input label="Receipt no" value={handBillNo} onChangeText={setHandBillNo} keyboardType="numeric" /></View>
+                </View>
+              </View>
+            )}
+          </Card>
+
+          {/* Customer */}
+          <View style={{ marginTop: spacing.lg }}>
+            <SectionTitle title="Customer" />
+            <Card style={{ gap: 14 }}>
+              <View style={styles.segment}>
+                {(['Regular', 'One_Time'] as const).map((ct) => (
+                  <Pressable key={ct} onPress={() => setCustomerType(ct)} style={[styles.segmentBtn, customerType === ct && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, customerType === ct && styles.segmentTextActive]}>{ct === 'One_Time' ? 'One-time' : 'Regular'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {customerType === 'Regular' && db.customers.length > 0 && (
+                <Select label="Pick saved customer" value={customerId} placeholder="Select or type below…" options={db.customers.map((c) => ({ label: c.name, value: c.id, sub: c.phone }))} onChange={pickCustomer} />
+              )}
+              <Input label="Name" value={customerName} onChangeText={(t) => { setCustomerName(t); setCustomerId(undefined) }} placeholder="Customer name" />
+              <Input label="Phone" value={customerPhone} onChangeText={setCustomerPhone} keyboardType="phone-pad" placeholder="10-digit mobile" />
+              <Input label="Address" value={customerAddress} onChangeText={setCustomerAddress} multiline />
+              {gstCompany && <Input label="Customer GSTIN (optional)" value={customerGstin} onChangeText={setCustomerGstin} autoCapitalize="characters" placeholder="For B2B invoices" />}
+            </Card>
+          </View>
+
+          {/* GST toggle */}
+          {gstCompany && (
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.toggleLabel}>Apply GST</Text>
+                <Text style={styles.toggleSub}>Turn off for a bill without tax</Text>
+              </View>
+              <Switch value={gstEnabled} onValueChange={setGstEnabled} trackColor={{ true: colors.brandLight }} thumbColor="#fff" />
+            </View>
+          )}
+
+          {/* Items */}
+          <View style={{ marginTop: spacing.lg }}>
+            <SectionTitle title="Items" />
+            <LineItemEditor items={items} onChange={setItems} gstMode={gstMode} taxRates={db.settings.taxRates} showCost />
+          </View>
+
+          {/* Discount + received + cost */}
+          <Card style={{ marginTop: spacing.lg, gap: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
+              <View style={{ flex: 1 }}><Input label={`Discount ${discountIsPercent ? '(%)' : '(₹)'}`} value={discountAmount} onChangeText={setDiscountAmount} keyboardType="numeric" placeholder="0" /></View>
+              <Pressable onPress={() => setDiscountIsPercent((v) => !v)} style={[styles.pctToggle, discountIsPercent && styles.pctToggleActive]}>
+                <Text style={[styles.pctText, discountIsPercent && { color: '#fff' }]}>{discountIsPercent ? '%' : '₹'}</Text>
+              </Pressable>
+            </View>
+            <Input label="Received now (₹)" value={receivedAmount} onChangeText={setReceivedAmount} keyboardType="numeric" placeholder="0" hint="Recorded as an initial payment" />
+            <Input label="Cost / buying price (₹, optional)" value={originalCost} onChangeText={setOriginalCost} keyboardType="numeric" placeholder="Never printed · profit report only" />
+          </Card>
+
+          {/* Live totals */}
+          <Card style={[styles.totalsCard, { marginTop: spacing.lg }]}>
+            <Row label="Gross" value={formatINR(totals.gross)} />
+            {totals.discount > 0 && <Row label="Discount" value={`- ${formatINR(totals.discount)}`} />}
+            {gstMode && <Row label="Tax" value={formatINR(totals.tax)} />}
+            <View style={styles.netRow}>
+              <Text style={styles.netLabel}>Net total</Text>
+              <Text style={styles.netValue}>{formatINR(totals.net)}</Text>
+            </View>
+            {num(receivedAmount) > 0 && <Row label="Balance" value={formatINR(totals.balance)} />}
+          </Card>
+
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: spacing.xl }}>
+            <Button title="Save draft" icon="save-outline" variant="outline" onPress={() => save(false)} loading={saving} style={{ flex: 1 }} />
+            <Button title="Finalize" icon="checkmark-done" onPress={() => save(true)} loading={saving} style={{ flex: 1 }} />
+          </View>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>
+}
+
+const styles = StyleSheet.create({
+  content: { padding: spacing.lg, paddingTop: spacing.md },
+  segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4, borderWidth: 1, borderColor: colors.border },
+  segmentBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm },
+  segmentActive: { backgroundColor: colors.brand },
+  segmentText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
+  segmentTextActive: { color: '#fff' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  toggleLabel: { ...font.body, color: colors.text, fontWeight: '700' },
+  toggleSub: { ...font.small, color: colors.textFaint, marginTop: 2 },
+  pctToggle: { width: 48, height: 46, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  pctToggleActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  pctText: { ...font.h3, color: colors.textMuted },
+  totalsCard: { backgroundColor: colors.tintIndigo, borderColor: 'transparent' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  rowLabel: { ...font.body, color: colors.textMuted },
+  rowValue: { ...font.body, color: colors.text, fontWeight: '700' },
+  netRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.borderStrong },
+  netLabel: { ...font.h3, color: colors.text },
+  netValue: { fontSize: 22, fontWeight: '800', color: colors.brand },
+})

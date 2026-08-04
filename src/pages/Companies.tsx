@@ -222,6 +222,27 @@ function CompanyModal({
           <input className="input" value={form.stateCode ?? ''} onChange={(e) => set({ stateCode: e.target.value })} placeholder="e.g. 33" />
         </div>
         <div>
+          <label className="label">Default tax mode (billing)</label>
+          <select
+            className="input"
+            value={form.defaultGstMode ?? (form.gstin?.trim() ? 'exclusive' : 'none')}
+            onChange={(e) => set({ defaultGstMode: e.target.value as Company['defaultGstMode'] })}
+            disabled={!form.gstin?.trim()}
+          >
+            <option value="exclusive">With GST — exclusive (add tax on top)</option>
+            <option value="inclusive">With GST — inclusive (rate includes tax)</option>
+            <option value="none">Without GST</option>
+          </select>
+          {!form.gstin?.trim() && <p className="mt-1 text-xs text-slate-400">Non-GST company — always plain invoice.</p>}
+        </div>
+        <div>
+          <label className="label">Default bill type</label>
+          <select className="input" value={form.defaultBillType ?? 'Online'} onChange={(e) => set({ defaultBillType: e.target.value as Company['defaultBillType'] })}>
+            <option value="Online">Online</option>
+            <option value="Handbill">Handbill</option>
+          </select>
+        </div>
+        <div>
           <label className="label">Invoice prefix</label>
           <input className="input font-mono" value={form.invoicePrefix ?? ''} onChange={(e) => set({ invoicePrefix: e.target.value })} placeholder="PT/" />
         </div>

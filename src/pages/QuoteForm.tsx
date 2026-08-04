@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useStore, type QuoteDraft } from '../lib/store'
@@ -8,7 +8,7 @@ import { useToast } from '../components/ui'
 import { computeTotals, costBasis, isGstCompany, recipientInterState } from '../lib/calc'
 import { formatINR, todayISO } from '../lib/format'
 import { nextQuoteNumbers } from '../lib/numbering'
-import type { LineItem, QuoteStatus } from '../lib/types'
+import type { GstMode, LineItem, QuoteStatus } from '../lib/types'
 import { uid } from '../lib/db'
 
 export default function QuoteForm() {
@@ -39,17 +39,31 @@ export default function QuoteForm() {
   )
   const [discountAmount, setDiscountAmount] = useState(existing?.discountAmount ?? 0)
   const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
-  const [gstEnabled, setGstEnabled] = useState(existing?.gstEnabled ?? true)
+  const initialCompany = db.companies.find((c) => c.id === initialCompanyId)
+  const initialTaxMode: GstMode = existing
+    ? existing.gstEnabled === false ? 'none' : existing.gstInclusive ? 'inclusive' : 'exclusive'
+    : initialCompany?.defaultGstMode ?? 'exclusive'
+  const [taxMode, setTaxMode] = useState<GstMode>(initialTaxMode)
   const [showLineCost, setShowLineCost] = useState(existing?.items.some((i) => i.cost != null) ?? false)
   const [originalCost, setOriginalCost] = useState(existing?.originalCost ?? 0)
 
   const company = db.companies.find((c) => c.id === companyId)
   const companyIsGst = isGstCompany(company)
+  const gstEnabled = taxMode !== 'none'
+  const gstInclusive = taxMode === 'inclusive'
   const gstMode = companyIsGst && gstEnabled
 
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (existing) return
+    if (firstRender.current) { firstRender.current = false; return }
+    setTaxMode(db.companies.find((x) => x.id === companyId)?.defaultGstMode ?? 'exclusive')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
   const totals = useMemo(
-    () => computeTotals({ items, discountAmount, discountIsPercent, company, interState: recipientInterState(company, customer.customerGstin), gstEnabled }),
-    [items, discountAmount, discountIsPercent, company, customer.customerGstin, gstEnabled],
+    () => computeTotals({ items, discountAmount, discountIsPercent, company, interState: recipientInterState(company, customer.customerGstin), gstEnabled, gstInclusive }),
+    [items, discountAmount, discountIsPercent, company, customer.customerGstin, gstEnabled, gstInclusive],
   )
 
   const cost = costBasis(items, originalCost)
@@ -78,6 +92,7 @@ export default function QuoteForm() {
       validUntil: validUntil || undefined,
       status: statusVal,
       gstEnabled: companyIsGst ? gstEnabled : false,
+      gstInclusive: companyIsGst && gstEnabled ? gstInclusive : false,
       originalCost: originalCost || undefined,
     }
     const saved = existing ? updateQuote(existing.id, draft) : createQuote(draft)
@@ -131,12 +146,16 @@ export default function QuoteForm() {
               <label className="label">Tax</label>
               {companyIsGst ? (
                 <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-sm">
-                  <button type="button" onClick={() => setGstEnabled(true)}
-                    className={`rounded-md px-3 py-1.5 font-medium ${gstEnabled ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
-                    With GST
+                  <button type="button" onClick={() => setTaxMode('exclusive')}
+                    className={`rounded-md px-3 py-1.5 font-medium ${taxMode === 'exclusive' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+                    GST (exclusive)
                   </button>
-                  <button type="button" onClick={() => setGstEnabled(false)}
-                    className={`rounded-md px-3 py-1.5 font-medium ${!gstEnabled ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+                  <button type="button" onClick={() => setTaxMode('inclusive')}
+                    className={`rounded-md px-3 py-1.5 font-medium ${taxMode === 'inclusive' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+                    GST (inclusive)
+                  </button>
+                  <button type="button" onClick={() => setTaxMode('none')}
+                    className={`rounded-md px-3 py-1.5 font-medium ${taxMode === 'none' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
                     Without GST
                   </button>
                 </div>

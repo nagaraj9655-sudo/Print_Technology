@@ -167,7 +167,7 @@ function UserModal({ user, onClose, onSave }: { user: User | null; onClose: () =
         {mode === 'supabase'
           ? user
             ? 'Editing updates this user’s name and role. Password/email changes are managed in Supabase.'
-            : 'Creates a real Supabase login account (requires the admin-create-user function to be deployed — see README).'
+            : 'Creates a real Supabase login account. If email confirmation is ON in your Supabase project, the new user must confirm via email before signing in (turn it off in Supabase → Authentication → Providers → Email for instant access).'
           : 'Note: local mode stores passwords in the browser. Switch to Supabase for secure, hashed accounts.'}
       </p>
       <div className="mt-5 flex justify-end gap-2">

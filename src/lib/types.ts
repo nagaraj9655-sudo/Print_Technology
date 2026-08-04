@@ -51,8 +51,13 @@ export interface Company {
   fontFamily?: string // document font, e.g. 'Poppins', 'Libre Baskerville'
   terms?: string // invoice terms & footer
   handbooks?: Handbook[] // manual bill books configured for this company
+  defaultGstMode?: GstMode // default tax mode preselected when billing this company
+  defaultBillType?: BillType // default Online / Handbill preselected for this company
   isActive: boolean
 }
+
+// Tax mode chosen per document (default configurable per company).
+export type GstMode = 'inclusive' | 'exclusive' | 'none'
 
 export type CustomerType = 'Regular' | 'One_Time'
 
@@ -106,6 +111,7 @@ export interface Bill {
   discountAmount: number // Discount_Amount
   discountIsPercent?: boolean
   gstEnabled?: boolean // per-document GST switch (only applies if company is GST-registered)
+  gstInclusive?: boolean // when GST on: true = entered rates already include GST (extract it)
   originalCost?: number // whole-document manual cost — NEVER printed; profit report only
   billType?: BillType // Online (system-numbered) | Handbill (manual paper book)
   handbookId?: ID // which manual book (Handbill)
@@ -139,6 +145,7 @@ export interface Quotation {
   discountAmount: number
   discountIsPercent?: boolean
   gstEnabled?: boolean // per-document GST switch (only applies if company is GST-registered)
+  gstInclusive?: boolean // when GST on: true = entered rates already include GST (extract it)
   originalCost?: number // whole-document manual cost — NEVER printed; profit report only
   status: QuoteStatus
   validUntil?: string

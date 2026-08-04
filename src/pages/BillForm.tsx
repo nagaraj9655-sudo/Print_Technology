@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, CheckCircle2, BookOpen, Wifi } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -10,7 +10,7 @@ import { computeTotals, costBasis, isGstCompany, recipientInterState } from '../
 import { handbookUsage } from '../lib/handbooks'
 import { formatINR, todayISO } from '../lib/format'
 import { nextBillNumbers } from '../lib/numbering'
-import type { BillType, LineItem } from '../lib/types'
+import type { BillType, GstMode, LineItem } from '../lib/types'
 import { uid } from '../lib/db'
 
 export default function BillForm() {
@@ -45,10 +45,18 @@ export default function BillForm() {
   const [receivedAmount, setReceivedAmount] = useState(existing?.receivedAmount ?? 0)
   const [saveToCustomers, setSaveToCustomers] = useState(false)
 
-  // GST switch (per document) — only meaningful for a GST-registered company.
-  const [gstEnabled, setGstEnabled] = useState(existing?.gstEnabled ?? true)
+  const initialCompany = db.companies.find((c) => c.id === initialCompanyId)
+  // Tax mode: With GST (exclusive) | With GST (inclusive) | Without GST.
+  const initialTaxMode: GstMode = existing
+    ? existing.gstEnabled === false
+      ? 'none'
+      : existing.gstInclusive
+        ? 'inclusive'
+        : 'exclusive'
+    : initialCompany?.defaultGstMode ?? 'exclusive'
+  const [taxMode, setTaxMode] = useState<GstMode>(initialTaxMode)
   // Online (system-numbered) vs Handbill (manual paper book).
-  const [billType, setBillType] = useState<BillType>(existing?.billType ?? 'Online')
+  const [billType, setBillType] = useState<BillType>(existing?.billType ?? initialCompany?.defaultBillType ?? 'Online')
   const [handbookId, setHandbookId] = useState(existing?.handbookId ?? '')
   const [handBookNo, setHandBookNo] = useState(existing?.handBookNo ?? '')
   const [handBillNo, setHandBillNo] = useState(existing?.handBillNo ?? '')
@@ -58,10 +66,23 @@ export default function BillForm() {
 
   const company = db.companies.find((c) => c.id === companyId)
   const companyIsGst = isGstCompany(company)
+  const gstEnabled = taxMode !== 'none'
+  const gstInclusive = taxMode === 'inclusive'
   const gstMode = companyIsGst && gstEnabled
   const handbooks = company?.handbooks ?? []
   const selectedBook = handbooks.find((h) => h.id === handbookId)
   const usage = useMemo(() => (selectedBook ? handbookUsage(selectedBook, db.bills) : null), [selectedBook, db.bills])
+
+  // On a NEW bill, apply the picked company's default tax mode & bill type.
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (existing) return
+    if (firstRender.current) { firstRender.current = false; return }
+    const c = db.companies.find((x) => x.id === companyId)
+    setTaxMode(c?.defaultGstMode ?? 'exclusive')
+    setBillType(c?.defaultBillType ?? 'Online')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
 
   const totals = useMemo(
     () =>
@@ -73,8 +94,9 @@ export default function BillForm() {
         company,
         interState: recipientInterState(company, customer.customerGstin),
         gstEnabled,
+        gstInclusive,
       }),
-    [items, discountAmount, discountIsPercent, receivedAmount, company, customer.customerGstin, gstEnabled],
+    [items, discountAmount, discountIsPercent, receivedAmount, company, customer.customerGstin, gstEnabled, gstInclusive],
   )
 
   const cost = costBasis(items, originalCost)
@@ -120,6 +142,7 @@ export default function BillForm() {
     discountIsPercent,
     receivedAmount,
     gstEnabled: companyIsGst ? gstEnabled : false,
+    gstInclusive: companyIsGst && gstEnabled ? gstInclusive : false,
     originalCost: originalCost || undefined,
     billType,
     handbookId: billType === 'Handbill' ? handbookId || undefined : undefined,
@@ -211,17 +234,26 @@ export default function BillForm() {
                 <label className="label">Tax</label>
                 {companyIsGst ? (
                   <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-sm">
-                    <button type="button" onClick={() => setGstEnabled(true)}
-                      className={`rounded-md px-3 py-1.5 font-medium ${gstEnabled ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
-                      With GST
+                    <button type="button" onClick={() => setTaxMode('exclusive')}
+                      className={`rounded-md px-3 py-1.5 font-medium ${taxMode === 'exclusive' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                      title="Rate is before GST; tax is added on top">
+                      GST (exclusive)
                     </button>
-                    <button type="button" onClick={() => setGstEnabled(false)}
-                      className={`rounded-md px-3 py-1.5 font-medium ${!gstEnabled ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+                    <button type="button" onClick={() => setTaxMode('inclusive')}
+                      className={`rounded-md px-3 py-1.5 font-medium ${taxMode === 'inclusive' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                      title="Rate already includes GST; tax is extracted from it">
+                      GST (inclusive)
+                    </button>
+                    <button type="button" onClick={() => setTaxMode('none')}
+                      className={`rounded-md px-3 py-1.5 font-medium ${taxMode === 'none' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
                       Without GST
                     </button>
                   </div>
                 ) : (
                   <p className="rounded-lg bg-slate-50 px-3 py-1.5 text-sm text-slate-500">Non-GST company — plain invoice</p>
+                )}
+                {companyIsGst && gstInclusive && (
+                  <p className="mt-1 text-xs text-amber-600">Item rates are treated as GST-inclusive; tax is split out automatically.</p>
                 )}
               </div>
             </div>

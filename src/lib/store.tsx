@@ -83,6 +83,7 @@ export interface BillDraft {
   discountIsPercent?: boolean
   receivedAmount: number
   gstEnabled?: boolean
+  gstInclusive?: boolean
   originalCost?: number
   billType?: Bill['billType']
   handbookId?: string
@@ -105,6 +106,7 @@ export interface QuoteDraft {
   validUntil?: string
   status: Quotation['status']
   gstEnabled?: boolean
+  gstInclusive?: boolean
   originalCost?: number
 }
 
@@ -341,6 +343,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         fontFamily: c.fontFamily ?? 'Inter',
         terms: c.terms,
         handbooks: c.handbooks ?? [],
+        defaultGstMode: c.defaultGstMode,
+        defaultBillType: c.defaultBillType,
         isActive: c.isActive ?? true,
       }
       mutate((d) => {
@@ -408,6 +412,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     discountAmount: draft.discountAmount || 0,
     discountIsPercent: draft.discountIsPercent,
     gstEnabled: draft.gstEnabled,
+    gstInclusive: draft.gstInclusive,
     originalCost: draft.originalCost,
     billType: draft.billType ?? 'Online',
     handbookId: draft.handbookId,
@@ -574,6 +579,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           discountAmount: draft.discountAmount || 0,
           discountIsPercent: draft.discountIsPercent,
           gstEnabled: draft.gstEnabled,
+          gstInclusive: draft.gstInclusive,
           originalCost: draft.originalCost,
           status: draft.status,
           validUntil: draft.validUntil,
@@ -609,6 +615,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           discountAmount: draft.discountAmount || 0,
           discountIsPercent: draft.discountIsPercent,
           gstEnabled: draft.gstEnabled,
+          gstInclusive: draft.gstInclusive,
           originalCost: draft.originalCost,
           status: draft.status,
           validUntil: draft.validUntil,
@@ -660,6 +667,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           discountAmount: q.discountAmount,
           discountIsPercent: q.discountIsPercent,
           gstEnabled: q.gstEnabled,
+          gstInclusive: q.gstInclusive,
           originalCost: q.originalCost,
           billType: 'Online',
           receivedAmount: 0,

@@ -52,6 +52,7 @@ interface Ctx {
   interState: boolean
   validUntil?: string
   topMm: number
+  inclusive: boolean
 }
 
 export function DocumentView(props: DocViewProps) {
@@ -72,8 +73,9 @@ export function DocumentView(props: DocViewProps) {
         : (doc as Quotation).companyQuoteNo
   const validUntil = !isBill ? (doc as Quotation).validUntil : undefined
   const topMm = (isBill ? settings.letterpadBillTopMm : settings.letterpadQuoteTopMm) ?? 40
+  const inclusive = gst && !!doc.gstInclusive
 
-  const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, topMm }
+  const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, topMm, inclusive }
   const template: DocTemplate = company?.template ?? 'modern'
 
   return (
@@ -374,12 +376,12 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
 /* ------------------------------------------------------------------ */
 
 function TotalsBlock({ ctx, variant }: { ctx: Ctx; variant: 'card' | 'ruled' }) {
-  const { gst, isBill, t, accent } = ctx
+  const { gst, isBill, t, accent, inclusive } = ctx
   const boxed = variant === 'card'
   return (
     <div className="mt-4 flex justify-end">
       <div className={`w-72 text-sm ${boxed ? 'rounded-lg border border-slate-300 p-3' : ''}`}>
-        <TotalRow label="Gross" value={formatINR(t.gross)} />
+        <TotalRow label={inclusive ? 'Gross (incl. GST)' : 'Gross'} value={formatINR(t.gross)} />
         {t.discount > 0 && <TotalRow label="Discount" value={`− ${formatINR(t.discount)}`} />}
         {gst && <TotalRow label="Taxable Value" value={formatINR(t.taxable)} />}
         {gst && t.igst > 0 && <TotalRow label="IGST" value={formatINR(t.igst)} />}

@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Magizhini",
+    "slug": "magizhini",
+    "scheme": "magizhini",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "primaryColor": "#4f46e5",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.magizhini.mobile"
+    },
+    "android": {
+      "package": "app.magizhini.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#4f46e5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
