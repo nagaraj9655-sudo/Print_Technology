@@ -47,9 +47,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const now = Date.now()
     const ONE_WEEK = 7 * 24 * 60 * 60 * 1000
     if (!lastBackup || now - parseInt(lastBackup, 10) > ONE_WEEK) {
-      exportFullBackup(db)
-      localStorage.setItem('magizhini.last_auto_backup', now.toString())
-      toast('Weekly automatic backup downloaded', 'info')
+      try {
+        exportFullBackup(db)
+        localStorage.setItem('magizhini.last_auto_backup', now.toString())
+        toast('Weekly automatic backup downloaded', 'info')
+      } catch (err) {
+        console.error('Failed to auto-backup', err)
+      }
     }
   }, [currentUser, db, toast])
 
