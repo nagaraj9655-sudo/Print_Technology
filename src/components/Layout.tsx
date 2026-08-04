@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Building2,
@@ -20,6 +20,8 @@ import { useStore } from '../lib/store'
 import { formatINR } from '../lib/format'
 import { canAccess } from '../lib/menus'
 import { PayQrModal } from './PayQrModal'
+import { exportFullBackup } from '../lib/excel'
+import { useToast } from './ui'
 
 const NAV = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,7 +37,21 @@ const NAV = [
 export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
-  const { currentUser } = useStore()
+  const { db, currentUser } = useStore()
+  const toast = useToast()
+
+  useEffect(() => {
+    // Run once on load to check if a weekly backup is needed
+    if (!currentUser || currentUser.role !== 'Admin') return
+    const lastBackup = localStorage.getItem('magizhini.last_auto_backup')
+    const now = Date.now()
+    const ONE_WEEK = 7 * 24 * 60 * 60 * 1000
+    if (!lastBackup || now - parseInt(lastBackup, 10) > ONE_WEEK) {
+      exportFullBackup(db)
+      localStorage.setItem('magizhini.last_auto_backup', now.toString())
+      toast('Weekly automatic backup downloaded', 'info')
+    }
+  }, [currentUser, db, toast])
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">

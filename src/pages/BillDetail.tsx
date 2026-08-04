@@ -30,19 +30,16 @@ export default function BillDetail() {
   const [payOpen, setPayOpen] = useState(false)
   const [showHeader, setShowHeader] = useState(true)
   const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 
   const bill = db.bills.find((b) => b.id === id)
   if (!bill) return <div className="text-slate-500">Bill not found.</div>
   const company = db.companies.find((c) => c.id === bill.companyId)
   const t = billTotals(bill, company)
 
-  const onDelete = async () => {
+  const onDelete = () => {
     if (currentUser?.role !== 'Admin') return toast('Only Admin can delete bills', 'error')
-    if (await confirm(`Move bill ${bill.companyBillNo} to the recycle bin?`)) {
-      deleteBill(bill.id)
-      toast('Bill moved to recycle bin')
-      navigate('/bills')
-    }
+    setDeleteModalOpen(true)
   }
 
   const onDuplicate = () => {
@@ -171,6 +168,42 @@ export default function BillDetail() {
         }}
       />
       {confirmNode}
+
+      <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Bill" size="sm">
+        <div className="flex items-start gap-3">
+          <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+          <p className="text-sm text-slate-600">
+            Move bill {bill.companyBillNo} to the recycle bin? You can optionally download a backup of this bill before deleting it.
+          </p>
+        </div>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button className="btn-outline" onClick={() => setDeleteModalOpen(false)}>
+            Cancel
+          </button>
+          <button
+            className="btn-outline"
+            onClick={() => {
+              exportBillExcel(bill, company)
+              deleteBill(bill.id)
+              toast('Bill backed up and moved to recycle bin')
+              navigate('/bills')
+            }}
+          >
+            Backup &amp; Delete
+          </button>
+          <button
+            className="btn-danger"
+            onClick={() => {
+              deleteBill(bill.id)
+              toast('Bill moved to recycle bin')
+              navigate('/bills')
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </Modal>
+
       <PaymentReminder open={!!reminderTarget} onClose={() => setReminderTarget(null)} target={reminderTarget} />
     </div>
   )
