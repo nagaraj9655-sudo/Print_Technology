@@ -188,6 +188,27 @@ export async function makePdf(html: string, _fileName?: string): Promise<string>
   return uri
 }
 
+/**
+ * Web-only PDF path. expo-print's printToFileAsync/printAsync on web operate on
+ * the *current* document (they'd print the app screen with the share sheet, not
+ * the invoice), so instead we open the rendered doc HTML in its own window and
+ * let the browser's print dialog "Save as PDF" it. Returns false if the popup
+ * was blocked. Native uses makePdf + expo-print, which render the HTML directly.
+ */
+export function webPrintDoc(html: string): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false
+  const w = window.open('', '_blank', 'width=820,height=1040')
+  if (!w) return false
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+  const fire = () => { try { w.focus(); w.print() } catch {} }
+  // Logo/signature are inline data URLs (no network), but give layout a beat.
+  if (w.document.readyState === 'complete') setTimeout(fire, 300)
+  else w.onload = () => setTimeout(fire, 300)
+  return true
+}
+
 /** Open the OS share sheet for a PDF (user can pick WhatsApp, Drive, etc.). */
 export async function sharePdf(uri: string, dialogTitle = 'Share document'): Promise<boolean> {
   if (!(await Sharing.isAvailableAsync())) return false

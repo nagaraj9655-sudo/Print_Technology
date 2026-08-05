@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { Ionicons } from '@expo/vector-icons'
 import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { useToast } from './ui'
-import { docSummary, emailPdf, makePdf, openSms, openWhatsApp, sharePdf } from '../lib/share'
+import { emailPdf, makePdf, openSms, openWhatsApp, sharePdf, webPrintDoc } from '../lib/share'
 
 export interface ShareConfig {
   title: string
@@ -25,6 +25,16 @@ export function ShareSheet({ open, onClose, config }: { open: boolean; onClose: 
   if (!config) return null
 
   const withPdf = async (label: string, run: (uri: string) => Promise<void>) => {
+    // On web, expo-print can only print the current page (it would capture the
+    // app screen, not the invoice). Open the rendered doc in its own window and
+    // let the browser "Save as PDF" it instead. Sharing/email aren't available
+    // on web either, so this print path covers every PDF option.
+    if (Platform.OS === 'web') {
+      const ok = webPrintDoc(config.buildHtml())
+      if (!ok) toast('Allow pop-ups to open the printable PDF', 'error')
+      onClose()
+      return
+    }
     try {
       setBusy(label)
       const uri = await makePdf(config.buildHtml(), config.fileName)

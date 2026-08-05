@@ -91,7 +91,7 @@ export function MoreScreen() {
 }
 
 const makeStyles = (colors: Palette) => StyleSheet.create({
-  content: { padding: spacing.lg },
+  content: { padding: spacing.lg, paddingBottom: 96 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: radius.xl, padding: spacing.lg },
   avatar: { width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontSize: 26, fontWeight: '800' },

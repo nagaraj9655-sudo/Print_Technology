@@ -46,7 +46,9 @@ function Tabs() {
   const insets = useSafeAreaInsets()
   const allowed = (key: string) => canAccess(currentUser?.role ?? 'Operator', currentUser?.allowedMenus, key)
   // Lift the bar above the Android gesture/nav bar so tabs are never hidden.
-  const bottomInset = Math.max(insets.bottom, 8)
+  // Floor the inset so the labels always clear the bottom edge even on devices
+  // that report a 0 bottom inset (older Android / 3-button nav / web).
+  const bottomInset = Math.max(insets.bottom, 12)
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -57,11 +59,11 @@ function Tabs() {
           backgroundColor: colors.surface,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
-          height: 58 + bottomInset,
+          height: 64 + bottomInset,
           paddingBottom: bottomInset,
-          paddingTop: 6,
+          paddingTop: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginBottom: 4 },
         tabBarIcon: ({ color, focused }) => {
           const map: Record<string, keyof typeof Ionicons.glyphMap> = {
             Dashboard: focused ? 'grid' : 'grid-outline',

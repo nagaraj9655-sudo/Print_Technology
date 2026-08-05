@@ -269,7 +269,7 @@ function Empty() {
 }
 
 const makeStyles = (colors: Palette) => StyleSheet.create({
-  content: { padding: spacing.lg, paddingTop: spacing.md },
+  content: { padding: spacing.lg, paddingTop: spacing.md, paddingBottom: 96 },
   syncBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.tintRose, borderRadius: radius.md, padding: 12, marginBottom: 12 },
   syncText: { flex: 1, color: colors.dangerDark, fontSize: 12.5, fontWeight: '600' },
   hint: { ...font.tiny, color: colors.textFaint, marginBottom: 8, marginLeft: 2 },
