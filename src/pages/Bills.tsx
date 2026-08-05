@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Download, FileSpreadsheet, Filter, Plus, Receipt } from 'lucide-react'
+import { Download, FileSpreadsheet, Filter, Plus, Receipt, Trash2 } from 'lucide-react'
 import { useStore, useScopedBills } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { formatDate, formatINR } from '../lib/format'
@@ -11,9 +11,12 @@ import type { PaymentStatus } from '../lib/types'
 type SortKey = 'date' | 'companyBillNo' | 'customerName' | 'net' | 'status'
 
 export default function Bills() {
-  const { db, activeCompanyId } = useStore()
+  const { db, activeCompanyId, currentUser } = useStore()
   const bills = useScopedBills()
   const navigate = useNavigate()
+  const deletedCount = db.bills.filter(
+    (b) => b.deletedAt && (activeCompanyId === 'ALL' ? true : b.companyId === activeCompanyId),
+  ).length
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'' | PaymentStatus | 'Draft'>('')
@@ -94,6 +97,14 @@ export default function Bills() {
           <p className="text-sm text-slate-500">{rows.length} bills · Net {formatINR(totalNet)} · Outstanding {formatINR(totalBalance)}</p>
         </div>
         <div className="flex gap-2">
+          {currentUser?.role === 'Admin' && (
+            <Link to="/bills/trash" className="btn-outline">
+              <Trash2 className="h-4 w-4" /> Recycle Bin
+              {deletedCount > 0 && (
+                <span className="ml-1 rounded-full bg-slate-200 px-1.5 text-xs font-semibold text-slate-600">{deletedCount}</span>
+              )}
+            </Link>
+          )}
           <button className="btn-outline" onClick={() => exportList(false)}>
             <FileSpreadsheet className="h-4 w-4" /> Export Excel
           </button>

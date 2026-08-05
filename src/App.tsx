@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Bills from './pages/Bills'
 import BillForm from './pages/BillForm'
 import BillDetail from './pages/BillDetail'
+import RecycleBin from './pages/RecycleBin'
 import Quotations from './pages/Quotations'
 import QuoteForm from './pages/QuoteForm'
 import QuoteDetail from './pages/QuoteDetail'
@@ -36,6 +37,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/bills" element={<Bills />} />
+        <Route path="/bills/trash" element={<RecycleBin />} />
         <Route path="/bills/new" element={<BillForm />} />
         <Route path="/bills/:id" element={<BillDetail />} />
         <Route path="/bills/:id/edit" element={<BillForm />} />

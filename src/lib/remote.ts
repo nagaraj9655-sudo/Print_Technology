@@ -234,7 +234,7 @@ export async function syncAll(data: Database): Promise<void> {
   if (failed?.error) throw failed.error
 }
 
-export async function deleteRow(table: 'companies' | 'customers', id: string): Promise<void> {
+export async function deleteRow(table: 'companies' | 'customers' | 'bills' | 'quotations', id: string): Promise<void> {
   const { error } = await db().from(table).delete().eq('id', id)
   if (error) throw error
 }

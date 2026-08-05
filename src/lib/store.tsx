@@ -66,6 +66,7 @@ interface StoreValue {
   recordPayment: (billId: string, payment: Omit<Payment, 'id'>) => void
   deleteBill: (id: string) => void
   restoreBill: (id: string) => void
+  permanentlyDeleteBill: (id: string) => void
   duplicateBill: (id: string) => Bill
 
   // quotations
@@ -562,6 +563,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [mutate],
   )
 
+  // Hard delete — permanently removes a bill from the recycle bin (and the cloud row).
+  const permanentlyDeleteBill: StoreValue['permanentlyDeleteBill'] = useCallback(
+    (id) => {
+      mutate((d) => { d.bills = d.bills.filter((x) => x.id !== id) })
+      if (mode === 'supabase') void remote.deleteRow('bills', id).catch((e) => console.error(e))
+    },
+    [mutate, mode],
+  )
+
   const duplicateBill: StoreValue['duplicateBill'] = useCallback(
     (id) => {
       let created!: Bill
@@ -768,6 +778,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     recordPayment,
     deleteBill,
     restoreBill,
+    permanentlyDeleteBill,
     duplicateBill,
     createQuote,
     updateQuote,
