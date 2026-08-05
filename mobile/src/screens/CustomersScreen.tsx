@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { formatINR } from '../lib/format'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { EmptyState, IconBadge } from '../components/ui'
 import { GradientHeader } from '../components/Header'
 import { PaymentReminder, type ReminderTarget } from '../components/PaymentReminder'
@@ -17,6 +17,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>
 export function CustomersScreen() {
   const nav = useNavigation<Nav>()
   const { db, activeCompanyId } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const [q, setQ] = useState('')
   const [remind, setRemind] = useState<ReminderTarget | null>(null)
 
@@ -78,12 +80,12 @@ export function CustomersScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   searchWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: colors.border },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 15, color: colors.text },
   list: { paddingHorizontal: spacing.lg, paddingBottom: 100, gap: 10 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   name: { ...font.body, color: colors.text, fontWeight: '800' },
   meta: { ...font.small, color: colors.textMuted, marginTop: 2 },
   due: { ...font.small, color: colors.danger, fontWeight: '700', marginTop: 2 },

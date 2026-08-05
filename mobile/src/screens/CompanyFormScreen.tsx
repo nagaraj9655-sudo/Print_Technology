@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { uid } from '../lib/db'
-import type { DocTemplate, Handbook } from '../lib/types'
-import { colors, font, radius, spacing } from '../theme'
+import { pickImageDataUrl } from '../lib/imagePick'
+import type { BillType, DocTemplate, GstMode, Handbook } from '../lib/types'
+import { font, radius, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, Input, SectionTitle, useConfirm, useToast } from '../components/ui'
 import { Select } from '../components/Select'
 import { GradientHeader } from '../components/Header'
@@ -14,14 +15,21 @@ import type { RootStackParamList } from '../navigation/types'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 const ACCENTS = ['#4f46e5', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#dc2626', '#4338ca']
-const TEMPLATES: DocTemplate[] = ['modern', 'classic', 'minimal']
+const TEMPLATES: DocTemplate[] = ['modern', 'classic', 'minimal', 'elegant', 'bold', 'grid']
 const FONTS = ['Inter', 'Poppins', 'Libre Baskerville', 'Roboto', 'Lato']
+const GST_MODES: { label: string; value: GstMode }[] = [
+  { label: 'Exclusive (tax added on top)', value: 'exclusive' },
+  { label: 'Inclusive (rates include tax)', value: 'inclusive' },
+  { label: 'No GST', value: 'none' },
+]
 
 export function CompanyFormScreen() {
   const nav = useNavigation<Nav>()
   const route = useRoute<RouteProp<RootStackParamList, 'CompanyForm'>>()
   const editId = route.params?.id
   const { db, saveCompany, deleteCompany } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
   const { confirm, node } = useConfirm()
   const existing = editId ? db.companies.find((c) => c.id === editId) : undefined
@@ -35,6 +43,12 @@ export function CompanyFormScreen() {
   const [bankDetails, setBankDetails] = useState(existing?.bankDetails ?? '')
   const [upiId, setUpiId] = useState(existing?.upiId ?? '')
   const [payeeName, setPayeeName] = useState(existing?.payeeName ?? '')
+  const [signatoryName, setSignatoryName] = useState(existing?.signatoryName ?? '')
+  const [signatureDataUrl, setSignatureDataUrl] = useState(existing?.signatureDataUrl)
+  const [logoDataUrl, setLogoDataUrl] = useState(existing?.logoDataUrl)
+  const [footerImageDataUrl, setFooterImageDataUrl] = useState(existing?.footerImageDataUrl)
+  const [footerW, setFooterW] = useState(existing?.footerImageWidthMm != null ? String(existing.footerImageWidthMm) : '')
+  const [footerH, setFooterH] = useState(existing?.footerImageHeightMm != null ? String(existing.footerImageHeightMm) : '')
   const [invoicePrefix, setInvoicePrefix] = useState(existing?.invoicePrefix ?? '')
   const [quotePrefix, setQuotePrefix] = useState(existing?.quotePrefix ?? '')
   const [accent, setAccent] = useState(existing?.accent ?? ACCENTS[0])
@@ -42,7 +56,17 @@ export function CompanyFormScreen() {
   const [fontFamily, setFontFamily] = useState(existing?.fontFamily ?? 'Inter')
   const [terms, setTerms] = useState(existing?.terms ?? '')
   const [isActive, setIsActive] = useState(existing?.isActive ?? true)
+  const [defaultGstMode, setDefaultGstMode] = useState<GstMode | undefined>(existing?.defaultGstMode)
+  const [defaultBillType, setDefaultBillType] = useState<BillType>(existing?.defaultBillType ?? 'Online')
+  const [defaultSimpleBill, setDefaultSimpleBill] = useState(existing?.defaultSimpleBill ?? false)
   const [handbooks, setHandbooks] = useState<Handbook[]>(existing?.handbooks ?? [])
+
+  const pickInto = async (setter: (v: string) => void) => {
+    const url = await pickImageDataUrl()
+    if (url) setter(url)
+    else toast('No image selected', 'info')
+  }
+  const numMm = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : undefined }
 
   const addHandbook = () => setHandbooks((h) => [...h, { id: uid(), name: 'New book', bookNo: String(h.length + 1), billsPerBook: 50, startNo: 1 }])
   const updateHb = (id: string, patch: Partial<Handbook>) => setHandbooks((h) => h.map((x) => (x.id === id ? { ...x, ...patch } : x)))
@@ -53,7 +77,10 @@ export function CompanyFormScreen() {
     if (!name.trim()) return toast('Enter a company name', 'error')
     saveCompany({
       id: editId, name: name.trim(), address, phone, email, gstin, stateCode, bankDetails, upiId, payeeName,
+      signatoryName, signatureDataUrl, logoDataUrl,
+      footerImageDataUrl, footerImageWidthMm: numMm(footerW), footerImageHeightMm: numMm(footerH),
       invoicePrefix, quotePrefix, accent, accent2: accent, template, fontFamily, terms, isActive, handbooks,
+      defaultGstMode, defaultBillType, defaultSimpleBill,
     })
     toast(editId ? 'Company updated' : 'Company added')
     nav.goBack()
@@ -96,8 +123,31 @@ export function CompanyFormScreen() {
             <Input label="Bank details" value={bankDetails} onChangeText={setBankDetails} multiline placeholder="A/c · IFSC" />
           </Card>
 
+          <SectionTitle title="Billing defaults" />
+          <Card style={{ gap: 14 }}>
+            <Select label="Default tax mode" value={defaultGstMode ?? ''} placeholder="Ask each time" options={GST_MODES} onChange={(v) => setDefaultGstMode(v as GstMode)} hint="Preselected when billing this company" />
+            <View>
+              <Text style={styles.label}>Default bill type</Text>
+              <View style={styles.segment}>
+                {(['Online', 'Handbill'] as BillType[]).map((bt) => (
+                  <Pressable key={bt} onPress={() => setDefaultBillType(bt)} style={[styles.segBtn, defaultBillType === bt && styles.segActive]}>
+                    <Text style={[styles.segText, defaultBillType === bt && { color: '#fff' }]}>{bt}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+            <View style={styles.toggleInline}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.toggleLabel}>Simple / cash bill by default</Text>
+                <Text style={styles.toggleSub}>No received/balance shown; treated as paid</Text>
+              </View>
+              <Switch value={defaultSimpleBill} onValueChange={setDefaultSimpleBill} trackColor={{ true: colors.brandLight }} thumbColor="#fff" />
+            </View>
+          </Card>
+
           <SectionTitle title="Branding" />
           <Card style={{ gap: 14 }}>
+            <ImageRow label="Company logo" uri={logoDataUrl} onPick={() => pickInto(setLogoDataUrl)} onClear={() => setLogoDataUrl(undefined)} />
             <View>
               <Text style={styles.label}>Accent colour</Text>
               <View style={styles.swatches}>
@@ -111,6 +161,17 @@ export function CompanyFormScreen() {
             <Select label="Document template" value={template} options={TEMPLATES.map((t) => ({ label: t[0].toUpperCase() + t.slice(1), value: t }))} onChange={(v) => setTemplate(v as DocTemplate)} />
             <Select label="Font family" value={fontFamily} options={FONTS.map((f) => ({ label: f, value: f }))} onChange={setFontFamily} />
             <Input label="Invoice terms / footer" value={terms} onChangeText={setTerms} multiline />
+          </Card>
+
+          <SectionTitle title="Signature & footer image" />
+          <Card style={{ gap: 14 }}>
+            <Input label="Signatory name" value={signatoryName} onChangeText={setSignatoryName} placeholder="Printed above the signature line" />
+            <ImageRow label="Signature image" uri={signatureDataUrl} onPick={() => pickInto(setSignatureDataUrl)} onClear={() => setSignatureDataUrl(undefined)} />
+            <ImageRow label="Footer image" uri={footerImageDataUrl} onPick={() => pickInto(setFooterImageDataUrl)} onClear={() => setFooterImageDataUrl(undefined)} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}><Input label="Footer width (mm)" value={footerW} onChangeText={setFooterW} keyboardType="numeric" placeholder="auto" /></View>
+              <View style={{ flex: 1 }}><Input label="Footer height (mm)" value={footerH} onChangeText={setFooterH} keyboardType="numeric" placeholder="auto" /></View>
+            </View>
           </Card>
 
           <SectionTitle title="Handbooks (manual bill books)" action={<Pressable onPress={addHandbook}><Text style={styles.addLink}>+ Add</Text></Pressable>} />
@@ -149,15 +210,41 @@ export function CompanyFormScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+function ImageRow({ label, uri, onPick, onClear }: { label: string; uri?: string; onPick: () => void; onClear: () => void }) {
+  const styles = useStyles(makeStyles)
+  const { colors } = useTheme()
+  return (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.imageRow}>
+        {uri ? <Image source={{ uri }} style={styles.thumb} resizeMode="contain" /> : <View style={[styles.thumb, styles.thumbEmpty]}><Ionicons name="image-outline" size={22} color={colors.textFaint} /></View>}
+        <View style={{ flex: 1, gap: 8 }}>
+          <Button title={uri ? 'Replace' : 'Upload'} icon="cloud-upload-outline" variant="outline" small onPress={onPick} />
+          {uri ? <Button title="Remove" icon="close" variant="ghost" small onPress={onClear} /> : null}
+        </View>
+      </View>
+    </View>
+  )
+}
+
+const makeStyles = (colors: Palette) => StyleSheet.create({
   content: { padding: spacing.lg, paddingTop: spacing.md, gap: 6 },
   label: { ...font.small, color: colors.textMuted, fontWeight: '600', marginBottom: 8 },
+  imageRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  thumb: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4, borderWidth: 1, borderColor: colors.border },
+  segBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm },
+  segActive: { backgroundColor: colors.brand },
+  segText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
+  toggleInline: { flexDirection: 'row', alignItems: 'center' },
+  toggleSub: { ...font.small, color: colors.textFaint, marginTop: 2 },
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   swatch: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   swatchActive: { borderWidth: 3, borderColor: '#fff', ...({ shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 }) },
   addLink: { ...font.small, color: colors.brand, fontWeight: '800' },
   emptyHb: { ...font.small, color: colors.textFaint },
   hbTitle: { ...font.h3, color: colors.text },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   toggleLabel: { ...font.body, color: colors.text, fontWeight: '700' },
 })

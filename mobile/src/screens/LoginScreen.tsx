@@ -5,10 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { Button, Input, useToast } from '../components/ui'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 
 export function LoginScreen() {
   const { login } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
   const insets = useSafeAreaInsets()
   const [email, setEmail] = useState('')
@@ -25,7 +27,7 @@ export function LoginScreen() {
   }
 
   return (
-    <LinearGradient colors={colors.gradBrand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={colors.gradBrand as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 50 }]} keyboardShouldPersistTaps="handled">
           <View style={styles.logo}><Text style={styles.logoText}>M</Text></View>
@@ -72,13 +74,13 @@ export function LoginScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   scroll: { paddingHorizontal: 24, paddingBottom: 40, alignItems: 'center' },
   logo: { width: 72, height: 72, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   logoText: { color: '#fff', fontSize: 40, fontWeight: '800' },
   brand: { ...font.h1, color: '#fff', fontSize: 30, marginTop: 14 },
   tag: { color: 'rgba(255,255,255,0.85)', fontSize: 13.5, marginTop: 4, fontWeight: '600' },
-  card: { backgroundColor: '#fff', borderRadius: radius.xl, padding: spacing.xl, width: '100%', marginTop: 34, ...shadow.float },
+  card: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.xl, width: '100%', marginTop: 34, ...shadow.float },
   cardTitle: { ...font.h2, color: colors.text },
   cardSub: { ...font.small, color: colors.textMuted, marginTop: 2 },
   eye: { position: 'absolute', right: 12, top: 34 },

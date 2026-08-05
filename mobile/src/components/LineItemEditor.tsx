@@ -5,7 +5,7 @@ import type { LineItem } from '../lib/types'
 import { lineTotal } from '../lib/calc'
 import { formatINR } from '../lib/format'
 import { uid } from '../lib/db'
-import { colors, font, radius, spacing } from '../theme'
+import { font, radius, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Select } from './Select'
 
 export function LineItemEditor({
@@ -15,8 +15,10 @@ export function LineItemEditor({
   onChange: (items: LineItem[]) => void
   gstMode: boolean
   taxRates: number[]
-  showCost: boolean
+  showCost?: boolean
 }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const update = (id: string, patch: Partial<LineItem>) => onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
   const remove = (id: string) => onChange(items.filter((it) => it.id !== id))
   const add = () => onChange([...items, { id: uid(), description: '', qty: 1, rate: 0, taxRate: gstMode ? taxRates[taxRates.length - 1] ?? 18 : undefined }])
@@ -94,6 +96,7 @@ export function LineItemEditor({
 }
 
 function MiniField({ label, children }: { label: string; children: React.ReactNode }) {
+  const styles = useStyles(makeStyles)
   return (
     <View style={{ flex: 1, gap: 5 }}>
       <Text style={styles.miniLabel}>{label}</Text>
@@ -102,13 +105,13 @@ function MiniField({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   card: { backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: 10 },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   idx: { ...font.tiny, color: colors.brand, textTransform: 'uppercase', letterSpacing: 0.4 },
-  desc: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, padding: 10, fontSize: 14, color: colors.text, minHeight: 40 },
+  desc: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, padding: 10, fontSize: 14, color: colors.text, minHeight: 40 },
   row: { flexDirection: 'row', gap: 10 },
-  mini: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: colors.text },
+  mini: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: colors.text },
   miniLabel: { ...font.tiny, color: colors.textMuted },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 },
   totalLabel: { ...font.small, color: colors.textMuted },

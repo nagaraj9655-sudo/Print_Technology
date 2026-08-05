@@ -4,9 +4,22 @@ import type { Bill, Company, Customer, Database, Payment, Quotation, Settings, U
 import { emptyDatabase, uid } from './db'
 import { commitBillNumbers, commitQuoteNumbers } from './numbering'
 import { billTotals } from './calc'
-import { todayISO } from './format'
+import { financialYear, todayISO } from './format'
 import { supabase } from './supabase'
 import * as remote from './remote'
+
+// Parse the trailing number from an edited doc number and set the per-company/FY
+// counter so the NEXT auto number is (edited + 1). e.g. "PT/2026-27/008" -> seq 8.
+function reconcileSeq(d: Database, kind: 'bill' | 'quote', companyId: string, dateISO: string, edited: string) {
+  const m = edited.match(/(\d+)\s*$/)
+  if (!m) return
+  const seq = parseInt(m[1], 10)
+  if (!Number.isFinite(seq)) return
+  const fy = financialYear(dateISO, d.settings.fyStartMonth)
+  const key = `${companyId}:${fy}`
+  const map = kind === 'bill' ? d.counters.companyBillSeq : d.counters.companyQuoteSeq
+  map[key] = seq
+}
 
 const ACTIVE_COMPANY_KEY = 'magizhini.activeCompany'
 const CACHE_KEY = 'magizhini.cache.v1'
@@ -31,11 +44,14 @@ export interface BillDraft {
   discountIsPercent?: boolean
   receivedAmount: number
   gstEnabled?: boolean
+  gstInclusive?: boolean
   originalCost?: number
   billType?: Bill['billType']
+  simpleBill?: boolean
   handbookId?: string
   handBookNo?: string
   handBillNo?: string
+  companyBillNoOverride?: string
 }
 
 export interface QuoteDraft {
@@ -53,7 +69,9 @@ export interface QuoteDraft {
   validUntil?: string
   status: Quotation['status']
   gstEnabled?: boolean
+  gstInclusive?: boolean
   originalCost?: number
+  companyQuoteNoOverride?: string
 }
 
 interface StoreValue {
@@ -83,6 +101,7 @@ interface StoreValue {
   recordPayment: (billId: string, payment: Omit<Payment, 'id'>) => void
   deleteBill: (id: string) => void
   restoreBill: (id: string) => void
+  permanentlyDeleteBill: (id: string) => void
   duplicateBill: (id: string) => Bill
 
   createQuote: (draft: QuoteDraft) => Quotation
@@ -265,6 +284,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       bankDetails: c.bankDetails,
       upiId: c.upiId?.trim() || undefined,
       payeeName: c.payeeName,
+      signatoryName: c.signatoryName,
+      signatureDataUrl: c.signatureDataUrl,
       invoicePrefix: c.invoicePrefix,
       quotePrefix: c.quotePrefix,
       accent: c.accent || '#4f46e5',
@@ -273,6 +294,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       fontFamily: c.fontFamily ?? 'Inter',
       terms: c.terms,
       handbooks: c.handbooks ?? [],
+      defaultGstMode: c.defaultGstMode,
+      defaultBillType: c.defaultBillType,
+      defaultSimpleBill: c.defaultSimpleBill,
+      footerImageDataUrl: c.footerImageDataUrl,
+      footerImageWidthMm: c.footerImageWidthMm || undefined,
+      footerImageHeightMm: c.footerImageHeightMm || undefined,
       isActive: c.isActive ?? true,
     }
     mutate((d) => {
@@ -323,8 +350,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     discountAmount: draft.discountAmount || 0,
     discountIsPercent: draft.discountIsPercent,
     gstEnabled: draft.gstEnabled,
+    gstInclusive: draft.gstInclusive,
     originalCost: draft.originalCost,
     billType: draft.billType ?? 'Online',
+    simpleBill: draft.simpleBill,
     handbookId: draft.handbookId,
     handBookNo: draft.handBookNo,
     handBillNo: draft.handBillNo,
@@ -341,6 +370,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         billNo: (d.counters.billNo = (d.counters.billNo || 0) + 1),
         companyBillNo: `${draft.handBookNo || '?'}/${draft.handBillNo || '?'}`,
       }
+    }
+    // Editable invoice number: use exactly what the user set and reseed the series to +1.
+    const override = draft.companyBillNoOverride?.trim()
+    if (override) {
+      reconcileSeq(d, 'bill', draft.companyId, draft.date, override)
+      return { billNo: (d.counters.billNo = (d.counters.billNo || 0) + 1), companyBillNo: override }
     }
     return commitBillNumbers(d, draft.companyId, draft.date)
   }
@@ -371,6 +406,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         companyBillNo = nums.companyBillNo
       } else if (draft.billType === 'Handbill' && prev.docStatus === 'Finalized') {
         companyBillNo = `${draft.handBookNo || '?'}/${draft.handBillNo || '?'}`
+      } else if (prev.docStatus === 'Finalized' && draft.companyBillNoOverride?.trim()) {
+        companyBillNo = draft.companyBillNoOverride.trim()
+        reconcileSeq(d, 'bill', draft.companyId, draft.date, companyBillNo)
       }
       updated = {
         ...prev, ...base, id: prev.id, billNo, companyBillNo,
@@ -404,6 +442,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (b) delete b.deletedAt
   }), [mutate])
 
+  const permanentlyDeleteBill: StoreValue['permanentlyDeleteBill'] = useCallback((id) => {
+    mutate((d) => { d.bills = d.bills.filter((x) => x.id !== id) })
+    void remote.deleteRow('bills', id).catch((e) => console.error(e))
+  }, [mutate])
+
   const duplicateBill: StoreValue['duplicateBill'] = useCallback((id) => {
     let created!: Bill
     mutate((d) => {
@@ -425,13 +468,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const createQuote: StoreValue['createQuote'] = useCallback((draft) => {
     let created!: Quotation
     mutate((d) => {
-      const nums = commitQuoteNumbers(d, draft.companyId, draft.date)
+      const override = draft.companyQuoteNoOverride?.trim()
+      let nums = commitQuoteNumbers(d, draft.companyId, draft.date)
+      if (override) {
+        reconcileSeq(d, 'quote', draft.companyId, draft.date, override)
+        nums = { quoteNo: nums.quoteNo, companyQuoteNo: override }
+      }
       created = {
         id: uid(), quoteNo: nums.quoteNo, companyQuoteNo: nums.companyQuoteNo, date: draft.date, companyId: draft.companyId,
         customerType: draft.customerType, customerId: draft.customerId, customerName: draft.customerName,
         customerAddress: draft.customerAddress, customerPhone: draft.customerPhone, customerGstin: draft.customerGstin?.trim() || undefined,
         items: draft.items, discountAmount: draft.discountAmount || 0, discountIsPercent: draft.discountIsPercent,
-        gstEnabled: draft.gstEnabled, originalCost: draft.originalCost, status: draft.status, validUntil: draft.validUntil,
+        gstEnabled: draft.gstEnabled, gstInclusive: draft.gstInclusive, originalCost: draft.originalCost, status: draft.status, validUntil: draft.validUntil,
         createdBy: currentUser?.name ?? 'system', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       }
       d.quotations.push(created)
@@ -445,12 +493,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const idx = d.quotations.findIndex((q) => q.id === id)
       if (idx < 0) return
       const prev = d.quotations[idx]
+      let companyQuoteNo = prev.companyQuoteNo
+      if (draft.companyQuoteNoOverride?.trim()) {
+        companyQuoteNo = draft.companyQuoteNoOverride.trim()
+        reconcileSeq(d, 'quote', draft.companyId, draft.date, companyQuoteNo)
+      }
       updated = {
         ...prev, date: draft.date, companyId: draft.companyId, customerType: draft.customerType, customerId: draft.customerId,
         customerName: draft.customerName, customerAddress: draft.customerAddress, customerPhone: draft.customerPhone,
         customerGstin: draft.customerGstin?.trim() || undefined, items: draft.items, discountAmount: draft.discountAmount || 0,
-        discountIsPercent: draft.discountIsPercent, gstEnabled: draft.gstEnabled, originalCost: draft.originalCost,
-        status: draft.status, validUntil: draft.validUntil, updatedAt: new Date().toISOString(),
+        discountIsPercent: draft.discountIsPercent, gstEnabled: draft.gstEnabled, gstInclusive: draft.gstInclusive, originalCost: draft.originalCost,
+        status: draft.status, validUntil: draft.validUntil, companyQuoteNo, updatedAt: new Date().toISOString(),
       }
       d.quotations[idx] = updated
     })
@@ -477,7 +530,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         id: uid(), billNo: nums.billNo, companyBillNo: nums.companyBillNo, date: todayISO(), companyId: q.companyId,
         customerType: q.customerType, customerId: q.customerId, customerName: q.customerName, customerAddress: q.customerAddress,
         customerPhone: q.customerPhone, customerGstin: q.customerGstin, items: q.items.map((it) => ({ ...it, id: uid() })),
-        discountAmount: q.discountAmount, discountIsPercent: q.discountIsPercent, gstEnabled: q.gstEnabled, originalCost: q.originalCost,
+        discountAmount: q.discountAmount, discountIsPercent: q.discountIsPercent, gstEnabled: q.gstEnabled, gstInclusive: q.gstInclusive, originalCost: q.originalCost,
         billType: 'Online', receivedAmount: 0, payments: [], docStatus: 'Finalized',
         createdBy: currentUser?.name ?? 'system', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       }
@@ -494,7 +547,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value: StoreValue = {
     db, currentUser, ready, syncError, activeCompanyId, setActiveCompanyId, activeCompany,
     login, logout, refresh, saveUser, deleteUser, saveCompany, deleteCompany, saveCustomer, deleteCustomer,
-    createBill, updateBill, recordPayment, deleteBill, restoreBill, duplicateBill,
+    createBill, updateBill, recordPayment, deleteBill, restoreBill, permanentlyDeleteBill, duplicateBill,
     createQuote, updateQuote, setQuoteStatus, deleteQuote, convertQuoteToBill, saveSettings,
   }
 

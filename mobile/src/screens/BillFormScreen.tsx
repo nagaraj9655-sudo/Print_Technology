@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore, type BillDraft } from '../lib/store'
-import { computeTotals, isGstCompany, recipientInterState } from '../lib/calc'
+import { computeTotals, costBasis, isGstCompany, recipientInterState } from '../lib/calc'
 import { formatINR, todayISO } from '../lib/format'
 import { handbookUsage } from '../lib/handbooks'
 import { uid } from '../lib/db'
-import type { Customer, LineItem } from '../lib/types'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { nextBillNumbers } from '../lib/numbering'
+import type { Customer, GstMode, LineItem } from '../lib/types'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, Input, SectionTitle, useToast } from '../components/ui'
 import { Select } from '../components/Select'
 import { LineItemEditor } from '../components/LineItemEditor'
@@ -23,6 +24,8 @@ export function BillFormScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'BillForm'>>()
   const editId = route.params?.id
   const { db, activeCompanyId, createBill, updateBill, saveCustomer } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
 
   const existing = editId ? db.bills.find((b) => b.id === editId) : undefined
@@ -39,24 +42,60 @@ export function BillFormScreen() {
   const [items, setItems] = useState<LineItem[]>(existing?.items ?? [{ id: uid(), description: '', qty: 1, rate: 0 }])
   const [discountAmount, setDiscountAmount] = useState(String(existing?.discountAmount ?? ''))
   const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
-  const [gstEnabled, setGstEnabled] = useState(existing?.gstEnabled ?? true)
+  const [taxMode, setTaxMode] = useState<GstMode>(
+    existing ? (existing.gstEnabled === false ? 'none' : existing.gstInclusive ? 'inclusive' : 'exclusive') : 'exclusive',
+  )
+  const [simpleBill, setSimpleBill] = useState(existing?.simpleBill ?? false)
   const [receivedAmount, setReceivedAmount] = useState(String(existing?.receivedAmount ?? ''))
-  const [originalCost, setOriginalCost] = useState(existing?.originalCost != null ? String(existing.originalCost) : '')
   const [billType, setBillType] = useState<'Online' | 'Handbill'>(existing?.billType ?? 'Online')
   const [handbookId, setHandbookId] = useState<string | undefined>(existing?.handbookId)
   const [handBookNo, setHandBookNo] = useState(existing?.handBookNo ?? '')
   const [handBillNo, setHandBillNo] = useState(existing?.handBillNo ?? '')
+  const [numberOverride, setNumberOverride] = useState(
+    existing && existing.docStatus === 'Finalized' && existing.billType !== 'Handbill' ? existing.companyBillNo : '',
+  )
+  // Cost tracking for the profit report (never printed on the bill).
+  const [originalCost, setOriginalCost] = useState(existing?.originalCost ?? 0)
   const [saving, setSaving] = useState(false)
 
   const company = db.companies.find((c) => c.id === companyId)
   const gstCompany = isGstCompany(company)
+  const gstEnabled = taxMode !== 'none'
+  const gstInclusive = taxMode === 'inclusive'
   const gstMode = gstCompany && gstEnabled
   const num = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0 }
 
+  // Apply the company's billing defaults when starting a NEW bill or switching company.
+  const firstRun = useRef(true)
+  useEffect(() => {
+    if (existing) return
+    if (firstRun.current) { firstRun.current = false }
+    if (!company) return
+    if (company.defaultGstMode) setTaxMode(company.defaultGstMode)
+    if (company.defaultBillType) setBillType(company.defaultBillType)
+    setSimpleBill(!!company.defaultSimpleBill)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
+  // Keep the editable invoice number in sync with the auto series for new/draft bills.
+  // Mirrors the web app's BillForm.tsx useEffect at lines 94-100.
+  useEffect(() => {
+    if (billType !== 'Online') return
+    if (existing && existing.docStatus === 'Finalized') return
+    const { companyBillNo } = nextBillNumbers(db, companyId, date)
+    setNumberOverride(companyBillNo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, date, billType])
+
   const totals = useMemo(() => computeTotals({
     items, discountAmount: num(discountAmount), discountIsPercent, receivedAmount: num(receivedAmount),
-    company, interState: recipientInterState(company, customerGstin), gstEnabled,
-  }), [items, discountAmount, discountIsPercent, receivedAmount, company, customerGstin, gstEnabled])
+    company, interState: recipientInterState(company, customerGstin), gstEnabled, gstInclusive,
+  }), [items, discountAmount, discountIsPercent, receivedAmount, company, customerGstin, gstEnabled, gstInclusive])
+
+  // Profit calculation (internal — never printed).
+  const cost = costBasis(items, originalCost)
+  const sellingBase = totals.taxable
+  const profit = sellingBase - cost
 
   const pickCustomer = (id: string) => {
     const c = db.customers.find((x) => x.id === id)
@@ -82,8 +121,11 @@ export function BillFormScreen() {
       companyId, date, customerType, customerId: customerType === 'Regular' ? cid : undefined,
       customerName: customerName.trim(), customerAddress, customerPhone, customerGstin,
       items: items.filter((it) => it.description.trim()), discountAmount: num(discountAmount), discountIsPercent,
-      receivedAmount: num(receivedAmount), gstEnabled, originalCost: originalCost ? num(originalCost) : undefined,
+      // simpleBill is a print-only flag — payment tracking is always independent (matches web app).
+      receivedAmount: num(receivedAmount),
+      gstEnabled, gstInclusive, simpleBill, originalCost: originalCost || undefined,
       billType, handbookId, handBookNo, handBillNo,
+      companyBillNoOverride: billType !== 'Handbill' && numberOverride.trim() ? numberOverride.trim() : undefined,
     }
   }
 
@@ -131,6 +173,19 @@ export function BillFormScreen() {
                 </View>
               </View>
             )}
+            {billType === 'Online' && (
+              <Input label="Invoice number (optional)" value={numberOverride} onChangeText={setNumberOverride} autoCapitalize="characters" placeholder="Auto — leave blank" hint="Blank = auto-number. Editing resets the series to this + 1." />
+            )}
+            <View>
+              <Text style={styles.fieldLabel}>Bill format</Text>
+              <View style={styles.segment}>
+                {([['Standard', false], ['Simple (cash)', true]] as const).map(([lbl, val]) => (
+                  <Pressable key={lbl} onPress={() => setSimpleBill(val)} style={[styles.segmentBtn, simpleBill === val && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, simpleBill === val && styles.segmentTextActive]}>{lbl}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
           </Card>
 
           {/* Customer */}
@@ -154,24 +209,30 @@ export function BillFormScreen() {
             </Card>
           </View>
 
-          {/* GST toggle */}
+          {/* Tax mode */}
           {gstCompany && (
-            <View style={styles.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.toggleLabel}>Apply GST</Text>
-                <Text style={styles.toggleSub}>Turn off for a bill without tax</Text>
+            <Card style={{ marginTop: spacing.lg, gap: 8 }}>
+              <Text style={styles.fieldLabel}>Tax mode</Text>
+              <View style={styles.segment}>
+                {([['Exclusive', 'exclusive'], ['Inclusive', 'inclusive'], ['No GST', 'none']] as const).map(([lbl, val]) => (
+                  <Pressable key={val} onPress={() => setTaxMode(val)} style={[styles.segmentBtn, taxMode === val && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, taxMode === val && styles.segmentTextActive]}>{lbl}</Text>
+                  </Pressable>
+                ))}
               </View>
-              <Switch value={gstEnabled} onValueChange={setGstEnabled} trackColor={{ true: colors.brandLight }} thumbColor="#fff" />
-            </View>
+              <Text style={styles.toggleSub}>
+                {taxMode === 'inclusive' ? 'Entered rates already include GST — tax is extracted.' : taxMode === 'none' ? 'No tax applied to this bill.' : 'GST added on top of the entered rates.'}
+              </Text>
+            </Card>
           )}
 
           {/* Items */}
           <View style={{ marginTop: spacing.lg }}>
             <SectionTitle title="Items" />
-            <LineItemEditor items={items} onChange={setItems} gstMode={gstMode} taxRates={db.settings.taxRates} showCost />
+            <LineItemEditor items={items} onChange={setItems} gstMode={gstMode} taxRates={db.settings.taxRates} />
           </View>
 
-          {/* Discount + received + cost */}
+          {/* Discount + received */}
           <Card style={{ marginTop: spacing.lg, gap: 14 }}>
             <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
               <View style={{ flex: 1 }}><Input label={`Discount ${discountIsPercent ? '(%)' : '(₹)'}`} value={discountAmount} onChangeText={setDiscountAmount} keyboardType="numeric" placeholder="0" /></View>
@@ -179,20 +240,55 @@ export function BillFormScreen() {
                 <Text style={[styles.pctText, discountIsPercent && { color: '#fff' }]}>{discountIsPercent ? '%' : '₹'}</Text>
               </Pressable>
             </View>
-            <Input label="Received now (₹)" value={receivedAmount} onChangeText={setReceivedAmount} keyboardType="numeric" placeholder="0" hint="Recorded as an initial payment" />
-            <Input label="Cost / buying price (₹, optional)" value={originalCost} onChangeText={setOriginalCost} keyboardType="numeric" placeholder="Never printed · profit report only" />
+            {simpleBill
+              ? <>
+                  <Input
+                    label="Received now (₹)"
+                    value={receivedAmount}
+                    onChangeText={setReceivedAmount}
+                    keyboardType="numeric"
+                    placeholder={String(Math.round(totals.net))}
+                    hint="Simple bill — payment is tracked here but not printed on the bill."
+                  />
+                </>
+              : <Input label="Received now (₹)" value={receivedAmount} onChangeText={setReceivedAmount} keyboardType="numeric" placeholder="0" hint="Recorded as an initial payment" />}
           </Card>
 
           {/* Live totals */}
           <Card style={[styles.totalsCard, { marginTop: spacing.lg }]}>
             <Row label="Gross" value={formatINR(totals.gross)} />
             {totals.discount > 0 && <Row label="Discount" value={`- ${formatINR(totals.discount)}`} />}
-            {gstMode && <Row label="Tax" value={formatINR(totals.tax)} />}
+            {gstMode && <Row label={gstInclusive ? 'Tax (incl.)' : 'Tax'} value={formatINR(totals.tax)} />}
             <View style={styles.netRow}>
-              <Text style={styles.netLabel}>Net total</Text>
+              <Text style={styles.netLabel}>{simpleBill ? 'Total' : 'Net total'}</Text>
               <Text style={styles.netValue}>{formatINR(totals.net)}</Text>
             </View>
             {num(receivedAmount) > 0 && <Row label="Balance" value={formatINR(totals.balance)} />}
+          </Card>
+
+          {/* Original cost / profit (internal — never printed on the bill) */}
+          <Card style={[styles.profitCard, { marginTop: spacing.lg }]}>
+            <Text style={styles.profitTitle}>Profit (internal)</Text>
+            <Text style={styles.profitSub}>Original cost is never printed on the bill.</Text>
+            <View style={{ gap: 12, marginTop: 10 }}>
+              <Input
+                label="Total original cost (₹, optional)"
+                value={originalCost ? String(originalCost) : ''}
+                onChangeText={(t) => setOriginalCost(parseFloat(t) || 0)}
+                keyboardType="numeric"
+                placeholder="0.00"
+                hint="Overrides per-item costs if set."
+              />
+              <Row label="Cost basis" value={formatINR(cost)} />
+              <Row label="Selling (ex-tax)" value={formatINR(sellingBase)} />
+              <View style={styles.profitRow}>
+                <Text style={styles.profitLabel}>Profit</Text>
+                <Text style={[styles.profitValue, { color: profit >= 0 ? '#10b981' : '#ef4444' }]}>
+                  {formatINR(profit)}
+                  {sellingBase > 0 && <Text style={styles.profitPct}>  ({Math.round((profit / sellingBase) * 100)}%)</Text>}
+                </Text>
+              </View>
+            </View>
           </Card>
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: spacing.xl }}>
@@ -207,17 +303,19 @@ export function BillFormScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const styles = useStyles(makeStyles)
   return <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   content: { padding: spacing.lg, paddingTop: spacing.md },
   segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4, borderWidth: 1, borderColor: colors.border },
   segmentBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm },
   segmentActive: { backgroundColor: colors.brand },
   segmentText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
   segmentTextActive: { color: '#fff' },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  fieldLabel: { ...font.small, color: colors.textMuted, fontWeight: '600', marginBottom: 6 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   toggleLabel: { ...font.body, color: colors.text, fontWeight: '700' },
   toggleSub: { ...font.small, color: colors.textFaint, marginTop: 2 },
   pctToggle: { width: 48, height: 46, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
@@ -230,4 +328,11 @@ const styles = StyleSheet.create({
   netRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.borderStrong },
   netLabel: { ...font.h3, color: colors.text },
   netValue: { fontSize: 22, fontWeight: '800', color: colors.brand },
+  profitCard: { backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)' },
+  profitTitle: { ...font.body, color: colors.text, fontWeight: '700' },
+  profitSub: { ...font.small, color: colors.textFaint, marginTop: 2 },
+  profitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  profitLabel: { ...font.body, color: colors.text, fontWeight: '600' },
+  profitValue: { ...font.body, fontWeight: '800' },
+  profitPct: { fontSize: 11, fontWeight: '500', color: colors.textFaint },
 })

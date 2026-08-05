@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Field } from './ui'
 
 export interface Option {
@@ -21,6 +21,8 @@ export function Select({
   hint?: string
 }) {
   const [open, setOpen] = useState(false)
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const current = options.find((o) => o.value === value)
   return (
     <Field label={label} hint={hint}>
@@ -60,11 +62,11 @@ export function Select({
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   control: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceAlt, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12 },
   value: { flex: 1, fontSize: 15, color: colors.text, fontWeight: '500' },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: 34, ...shadow.float },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: 34, ...shadow.float },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, marginBottom: 12 },
   sheetTitle: { ...font.h3, color: colors.text, marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 12, borderRadius: radius.md, gap: 8 },

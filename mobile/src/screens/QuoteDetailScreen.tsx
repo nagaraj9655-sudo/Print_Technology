@@ -1,16 +1,18 @@
-import React, { useMemo } from 'react'
-import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import React, { useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { quoteTotals, lineTotal, docUsesGst, recipientInterState } from '../lib/calc'
 import { amountInWords, formatDate, formatINR } from '../lib/format'
+import { quoteHtml, docSummary } from '../lib/share'
 import type { QuoteStatus } from '../lib/types'
-import { colors, font, radius, spacing } from '../theme'
+import { font, radius, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, IconBadge, SectionTitle, StatusPill, useConfirm, useToast } from '../components/ui'
 import { Select } from '../components/Select'
 import { GradientHeader } from '../components/Header'
+import { ShareSheet, type ShareConfig } from '../components/ShareSheet'
 import type { RootStackParamList } from '../navigation/types'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
@@ -20,8 +22,11 @@ export function QuoteDetailScreen() {
   const nav = useNavigation<Nav>()
   const route = useRoute<RouteProp<RootStackParamList, 'QuoteDetail'>>()
   const { db, setQuoteStatus, deleteQuote, convertQuoteToBill } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
   const { confirm, node } = useConfirm()
+  const [shareOpen, setShareOpen] = useState(false)
 
   const quote = db.quotations.find((q) => q.id === route.params.id)
   const company = db.companies.find((c) => c.id === quote?.companyId)
@@ -48,10 +53,14 @@ export function QuoteDetailScreen() {
     }
   }
 
-  const shareText = async () => {
-    const lines = quote.items.map((it) => `• ${it.description} — ${it.qty} × ${formatINR(it.rate)} = ${formatINR(lineTotal(it))}`).join('\n')
-    const msg = `${company?.name}\nQuotation ${quote.companyQuoteNo} · ${formatDate(quote.date)}\nFor: ${quote.customerName}\n\n${lines}\n\nTotal: ${formatINR(t.net)}${quote.validUntil ? `\nValid until: ${formatDate(quote.validUntil)}` : ''}`
-    try { await Share.share({ message: msg }) } catch { /* cancelled */ }
+  const shareConfig: ShareConfig = {
+    title: `Quotation ${quote.companyQuoteNo}`,
+    phone: quote.customerPhone,
+    email: undefined,
+    buildHtml: () => quoteHtml(quote, company, db.settings),
+    fileName: `Quotation-${quote.companyQuoteNo}`.replace(/[^\w-]+/g, '-'),
+    summary: docSummary({ companyName: company?.name, isQuote: true, no: quote.companyQuoteNo, date: quote.date, net: t.net }),
+    emailSubject: `Quotation ${quote.companyQuoteNo}${company?.name ? ` from ${company.name}` : ''}`,
   }
 
   const doDelete = async () => {
@@ -61,7 +70,7 @@ export function QuoteDetailScreen() {
   return (
     <View style={{ flex: 1 }}>
       <GradientHeader title={quote.companyQuoteNo} subtitle={company?.name} showCompany={false} onBack={() => nav.goBack()}
-        right={<Pressable onPress={shareText} hitSlop={8} style={styles.headerBtn}><Ionicons name="share-social" size={18} color="#fff" /></Pressable>} />
+        right={<Pressable onPress={() => setShareOpen(true)} hitSlop={8} style={styles.headerBtn}><Ionicons name="share-social" size={18} color="#fff" /></Pressable>} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -121,6 +130,7 @@ export function QuoteDetailScreen() {
 
         <View style={styles.actionGrid}>
           {quote.status !== 'Converted' && <Button title="Convert to bill" icon="swap-horizontal" onPress={convert} style={{ flex: 1, minWidth: 150 }} />}
+          <Button title="Share" icon="share-social-outline" variant="outline" onPress={() => setShareOpen(true)} style={{ flex: 1, minWidth: 150 }} />
           <Button title="Edit" icon="create-outline" variant="outline" onPress={() => nav.navigate('QuoteForm', { id: quote.id })} style={{ flex: 1, minWidth: 150 }} />
           <Button title="Delete" icon="trash-outline" variant="danger" onPress={doDelete} style={{ flex: 1, minWidth: 150 }} />
         </View>
@@ -132,19 +142,22 @@ export function QuoteDetailScreen() {
         ) : null}
         <View style={{ height: 40 }} />
       </ScrollView>
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} config={shareConfig} />
       {node}
     </View>
   )
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
+  const styles = useStyles(makeStyles)
   return <View style={{ flex: 1 }}><Text style={styles.metaLabel}>{label}</Text><Text style={styles.metaValue}>{value}</Text></View>
 }
 function Row({ label, value }: { label: string; value: string }) {
+  const styles = useStyles(makeStyles)
   return <View style={styles.totalLine}><Text style={styles.totalLineLabel}>{label}</Text><Text style={styles.totalLineValue}>{value}</Text></View>
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   content: { padding: spacing.lg, paddingTop: spacing.md },
   headerBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   heroLabel: { ...font.small, color: colors.textMuted },

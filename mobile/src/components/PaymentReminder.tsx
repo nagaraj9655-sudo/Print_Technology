@@ -6,7 +6,7 @@ import { useStore } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { formatINR } from '../lib/format'
 import { buildReminderMessage, smsLink, whatsappLink, type ReminderLine } from '../lib/payments'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, useToast } from './ui'
 import { UpiQr } from './UpiQr'
 
@@ -18,6 +18,8 @@ export interface ReminderTarget {
 
 export function PaymentReminder({ open, onClose, target }: { open: boolean; onClose: () => void; target: ReminderTarget | null }) {
   const { db, activeCompanyId } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
 
   const info = useMemo(() => {
@@ -108,7 +110,7 @@ export function PaymentReminder({ open, onClose, target }: { open: boolean; onCl
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: 30, maxHeight: '92%', ...shadow.float },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, marginBottom: 12 },
@@ -119,12 +121,12 @@ const styles = StyleSheet.create({
   totalLabel: { ...font.small, color: colors.dangerDark, fontWeight: '700' },
   totalValue: { fontSize: 30, fontWeight: '800', color: colors.dangerDark, marginTop: 2 },
   totalSub: { ...font.small, color: colors.danger },
-  lineRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#fff', borderRadius: radius.md, marginBottom: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  lineRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.surface, borderRadius: radius.md, marginBottom: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   lineNo: { ...font.body, color: colors.text, fontWeight: '600' },
   lineBal: { ...font.body, color: colors.danger, fontWeight: '700' },
-  qrWrap: { alignItems: 'center', marginVertical: 14, backgroundColor: '#fff', borderRadius: radius.lg, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  qrWrap: { alignItems: 'center', marginVertical: 14, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   previewLabel: { ...font.small, color: colors.textMuted, fontWeight: '700', marginTop: 6, marginBottom: 6 },
-  preview: { backgroundColor: '#fff', borderRadius: radius.md, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, marginBottom: 12 },
+  preview: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, marginBottom: 12 },
   previewText: { fontSize: 13, color: colors.textMuted, lineHeight: 20 },
   actions: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 },
 })

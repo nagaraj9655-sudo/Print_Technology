@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
-import { spacing } from '../theme'
+import { font, radius, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, Input, SectionTitle, useToast } from '../components/ui'
 import { Select } from '../components/Select'
 import { GradientHeader } from '../components/Header'
@@ -15,6 +17,8 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 export function SettingsScreen() {
   const nav = useNavigation<Nav>()
   const { db, saveSettings } = useStore()
+  const { id: themeId, themes, setThemeId } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
   const s = db.settings
 
@@ -44,6 +48,24 @@ export function SettingsScreen() {
       <GradientHeader title="Settings" showCompany={false} onBack={() => nav.goBack()} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={90}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <SectionTitle title="Appearance" />
+          <Card>
+            <Text style={styles.themeHint}>Pick an app theme — it recolours the whole app instantly.</Text>
+            <View style={styles.themeGrid}>
+              {themes.map((th) => {
+                const active = th.id === themeId
+                return (
+                  <Pressable key={th.id} onPress={() => setThemeId(th.id)} style={[styles.themeCell, active && styles.themeCellActive]}>
+                    <LinearGradient colors={th.swatch as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.themeSwatch}>
+                      {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+                    </LinearGradient>
+                    <Text style={[styles.themeName, active && styles.themeNameActive]}>{th.name}</Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          </Card>
+
           <SectionTitle title="General" />
           <Card style={{ gap: 14 }}>
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -76,4 +98,13 @@ export function SettingsScreen() {
   )
 }
 
-const styles = StyleSheet.create({ content: { padding: spacing.lg, paddingTop: spacing.md, gap: 6 } })
+const makeStyles = (colors: Palette) => StyleSheet.create({
+  content: { padding: spacing.lg, paddingTop: spacing.md, gap: 6 },
+  themeHint: { ...font.small, color: colors.textMuted, marginBottom: 12 },
+  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  themeCell: { alignItems: 'center', gap: 6, width: 72 },
+  themeCellActive: {},
+  themeSwatch: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
+  themeName: { ...font.tiny, color: colors.textMuted },
+  themeNameActive: { color: colors.brand, fontWeight: '800' },
+})

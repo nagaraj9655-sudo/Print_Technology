@@ -1,13 +1,13 @@
-import React, { useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import React, { useEffect, useMemo, useState } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useStore, type QuoteDraft } from '../lib/store'
 import { computeTotals, isGstCompany, recipientInterState } from '../lib/calc'
 import { formatINR, todayISO } from '../lib/format'
 import { uid } from '../lib/db'
-import type { Customer, LineItem, QuoteStatus } from '../lib/types'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import type { Customer, GstMode, LineItem, QuoteStatus } from '../lib/types'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, Input, SectionTitle, useToast } from '../components/ui'
 import { Select } from '../components/Select'
 import { LineItemEditor } from '../components/LineItemEditor'
@@ -22,6 +22,8 @@ export function QuoteFormScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'QuoteForm'>>()
   const editId = route.params?.id
   const { db, activeCompanyId, createQuote, updateQuote, saveCustomer } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
 
   const existing = editId ? db.quotations.find((q) => q.id === editId) : undefined
@@ -40,18 +42,29 @@ export function QuoteFormScreen() {
   const [items, setItems] = useState<LineItem[]>(existing?.items ?? [{ id: uid(), description: '', qty: 1, rate: 0 }])
   const [discountAmount, setDiscountAmount] = useState(String(existing?.discountAmount ?? ''))
   const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
-  const [gstEnabled, setGstEnabled] = useState(existing?.gstEnabled ?? true)
+  const [taxMode, setTaxMode] = useState<GstMode>(
+    existing ? (existing.gstEnabled === false ? 'none' : existing.gstInclusive ? 'inclusive' : 'exclusive') : 'exclusive',
+  )
+  const [numberOverride, setNumberOverride] = useState(existing?.companyQuoteNo ?? '')
   const [saving, setSaving] = useState(false)
 
   const company = db.companies.find((c) => c.id === companyId)
   const gstCompany = isGstCompany(company)
+  const gstEnabled = taxMode !== 'none'
+  const gstInclusive = taxMode === 'inclusive'
   const gstMode = gstCompany && gstEnabled
   const num = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0 }
 
+  useEffect(() => {
+    if (existing || !company?.defaultGstMode) return
+    setTaxMode(company.defaultGstMode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
   const totals = useMemo(() => computeTotals({
     items, discountAmount: num(discountAmount), discountIsPercent, company,
-    interState: recipientInterState(company, customerGstin), gstEnabled,
-  }), [items, discountAmount, discountIsPercent, company, customerGstin, gstEnabled])
+    interState: recipientInterState(company, customerGstin), gstEnabled, gstInclusive,
+  }), [items, discountAmount, discountIsPercent, company, customerGstin, gstEnabled, gstInclusive])
 
   const pickCustomer = (id: string) => {
     const c = db.customers.find((x) => x.id === id)
@@ -72,7 +85,8 @@ export function QuoteFormScreen() {
       companyId, date, customerType, customerId: customerType === 'Regular' ? cid : undefined,
       customerName: customerName.trim(), customerAddress, customerPhone, customerGstin,
       items: items.filter((it) => it.description.trim()), discountAmount: num(discountAmount), discountIsPercent,
-      validUntil: validUntil || undefined, status, gstEnabled,
+      validUntil: validUntil || undefined, status, gstEnabled, gstInclusive,
+      companyQuoteNoOverride: numberOverride.trim() || undefined,
     }
     setSaving(true)
     try {
@@ -94,6 +108,7 @@ export function QuoteFormScreen() {
               <View style={{ flex: 1 }}><Input label="Valid until" value={validUntil} onChangeText={setValidUntil} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
             </View>
             <Select label="Status" value={status} options={STATUSES.map((s) => ({ label: s, value: s }))} onChange={(s) => setStatus(s as QuoteStatus)} />
+            <Input label="Quotation number (optional)" value={numberOverride} onChangeText={setNumberOverride} autoCapitalize="characters" placeholder="Auto — leave blank" hint="Blank = auto-number. Editing resets the series." />
           </Card>
 
           <View style={{ marginTop: spacing.lg }}>
@@ -117,13 +132,16 @@ export function QuoteFormScreen() {
           </View>
 
           {gstCompany && (
-            <View style={styles.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.toggleLabel}>Apply GST</Text>
-                <Text style={styles.toggleSub}>Turn off for a quote without tax</Text>
+            <Card style={{ marginTop: spacing.lg, gap: 8 }}>
+              <Text style={styles.toggleLabel}>Tax mode</Text>
+              <View style={styles.segment}>
+                {([['Exclusive', 'exclusive'], ['Inclusive', 'inclusive'], ['No GST', 'none']] as const).map(([lbl, val]) => (
+                  <Pressable key={val} onPress={() => setTaxMode(val)} style={[styles.segmentBtn, taxMode === val && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, taxMode === val && styles.segmentTextActive]}>{lbl}</Text>
+                  </Pressable>
+                ))}
               </View>
-              <Switch value={gstEnabled} onValueChange={setGstEnabled} trackColor={{ true: colors.brandLight }} thumbColor="#fff" />
-            </View>
+            </Card>
           )}
 
           <View style={{ marginTop: spacing.lg }}>
@@ -159,17 +177,18 @@ export function QuoteFormScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const styles = useStyles(makeStyles)
   return <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   content: { padding: spacing.lg, paddingTop: spacing.md },
   segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4, borderWidth: 1, borderColor: colors.border },
   segmentBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm },
   segmentActive: { backgroundColor: colors.violet },
   segmentText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
   segmentTextActive: { color: '#fff' },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   toggleLabel: { ...font.body, color: colors.text, fontWeight: '700' },
   toggleSub: { ...font.small, color: colors.textFaint, marginTop: 2 },
   pctToggle: { width: 48, height: 46, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },

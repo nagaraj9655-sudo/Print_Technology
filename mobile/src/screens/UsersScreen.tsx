@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { OPERATOR_MENUS } from '../lib/menus'
 import type { Role, User } from '../lib/types'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, EmptyState, IconBadge, Input, useConfirm, useToast } from '../components/ui'
 import { GradientHeader } from '../components/Header'
 import type { RootStackParamList } from '../navigation/types'
@@ -16,6 +16,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>
 export function UsersScreen() {
   const nav = useNavigation<Nav>()
   const { db, currentUser, saveUser, deleteUser } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
   const { confirm, node } = useConfirm()
 
@@ -124,9 +126,9 @@ export function UsersScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   list: { padding: spacing.lg, paddingBottom: 100, gap: 10 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   name: { ...font.body, color: colors.text, fontWeight: '800' },
   meta: { ...font.small, color: colors.textMuted, marginTop: 2 },
   role: { ...font.tiny, color: colors.brand, marginTop: 2, textTransform: 'uppercase' },
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
   segBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm },
   segActive: { backgroundColor: colors.brand },
   segText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
-  menuBox: { backgroundColor: '#fff', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  menuBox: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   menuHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   menuTitle: { ...font.body, color: colors.text, fontWeight: '700' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 },

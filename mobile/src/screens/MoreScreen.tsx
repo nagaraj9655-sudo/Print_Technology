@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { canAccess } from '../lib/menus'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { GradientHeader } from '../components/Header'
 import { Button, useConfirm } from '../components/ui'
 import type { RootStackParamList } from '../navigation/types'
@@ -15,21 +15,23 @@ type Nav = NativeStackNavigationProp<RootStackParamList>
 
 interface Item { icon: keyof typeof Ionicons.glyphMap; label: string; sub: string; route: keyof RootStackParamList; color: string; bg: string; menuKey?: string; adminOnly?: boolean }
 
-const ITEMS: Item[] = [
+const buildItems = (colors: Palette): Item[] => [
   { icon: 'people', label: 'Customers', sub: 'Manage your customers', route: 'CustomersList', color: colors.cyan, bg: colors.tintCyan, menuKey: 'customers' },
   { icon: 'business', label: 'Companies', sub: 'Company profiles & branding', route: 'CompaniesList', color: colors.brand, bg: colors.tintIndigo, menuKey: 'companies' },
   { icon: 'bar-chart', label: 'Reports', sub: 'Sales, receivables, GST, profit', route: 'Reports', color: colors.violet, bg: colors.tintViolet, menuKey: 'reports' },
-  { icon: 'settings', label: 'Settings', sub: 'Tax, letter-pad, reminders', route: 'Settings', color: colors.textMuted, bg: colors.tintSlate, adminOnly: true },
+  { icon: 'settings', label: 'Settings', sub: 'Theme, tax, letter-pad, reminders', route: 'Settings', color: colors.textMuted, bg: colors.tintSlate, adminOnly: true },
   { icon: 'shield-checkmark', label: 'Users', sub: 'Team & access control', route: 'Users', color: colors.success, bg: colors.tintEmerald, adminOnly: true },
 ]
 
 export function MoreScreen() {
   const nav = useNavigation<Nav>()
   const { currentUser, logout, activeCompany } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const { confirm, node } = useConfirm()
   const role = currentUser?.role ?? 'Operator'
 
-  const items = ITEMS.filter((it) => {
+  const items = buildItems(colors).filter((it) => {
     if (it.adminOnly) return role === 'Admin'
     if (it.menuKey) return canAccess(role, currentUser?.allowedMenus, it.menuKey)
     return true
@@ -43,7 +45,7 @@ export function MoreScreen() {
     <View style={{ flex: 1 }}>
       <GradientHeader title="More" showCompany={false} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <LinearGradient colors={colors.gradBrand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.profile, shadow.card]}>
+        <LinearGradient colors={colors.gradBrand as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.profile, shadow.card]}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(currentUser?.name ?? '?').slice(0, 1).toUpperCase()}</Text>
           </View>
@@ -88,7 +90,7 @@ export function MoreScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   content: { padding: spacing.lg },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: radius.xl, padding: spacing.lg },
   avatar: { width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
@@ -99,7 +101,7 @@ const styles = StyleSheet.create({
   roleText: { color: '#fff', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   activeCompany: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.tintIndigo, borderRadius: radius.md, padding: 12, marginTop: spacing.md },
   activeText: { ...font.small, color: colors.brandDark },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   itemIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   itemLabel: { ...font.body, color: colors.text, fontWeight: '700', fontSize: 15 },
   itemSub: { ...font.small, color: colors.textFaint, marginTop: 2 },

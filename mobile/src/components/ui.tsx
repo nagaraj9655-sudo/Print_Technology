@@ -14,15 +14,17 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, font, radius, shadow, spacing, statusColor } from '../theme'
+import { font, radius, shadow, spacing, statusColor, useStyles, useTheme, type Palette } from '../theme'
 
 /* ----------------------------- Card ----------------------------- */
 export function Card({ children, style, padded = true }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; padded?: boolean }) {
+  const styles = useStyles(makeStyles)
   return <View style={[styles.card, padded && { padding: spacing.lg }, style]}>{children}</View>
 }
 
 /* --------------------------- Section title ---------------------- */
 export function SectionTitle({ title, action }: { title: string; action?: React.ReactNode }) {
+  const styles = useStyles(makeStyles)
   return (
     <View style={styles.sectionTitleRow}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -46,14 +48,16 @@ export function Button({
   full?: boolean
   style?: StyleProp<ViewStyle>
 }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const content = (
     <>
       {loading ? (
         <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.brand : '#fff'} size="small" />
       ) : (
         <>
-          {icon && <Ionicons name={icon} size={small ? 15 : 18} color={btnTextColor(variant)} />}
-          <Text style={[styles.btnText, { color: btnTextColor(variant), fontSize: small ? 13 : 15 }]}>{title}</Text>
+          {icon && <Ionicons name={icon} size={small ? 15 : 18} color={btnTextColor(variant, colors)} />}
+          <Text style={[styles.btnText, { color: btnTextColor(variant, colors), fontSize: small ? 13 : 15 }]}>{title}</Text>
         </>
       )}
     </>
@@ -64,7 +68,7 @@ export function Button({
   if (variant === 'primary') {
     return (
       <Pressable onPress={disabled || loading ? undefined : onPress} style={[full && { alignSelf: 'stretch' }, style]}>
-        <LinearGradient colors={colors.gradBrand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[base, pad, shadow.card]}>
+        <LinearGradient colors={colors.gradBrand as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[base, pad, shadow.card]}>
           {content}
         </LinearGradient>
       </Pressable>
@@ -82,7 +86,7 @@ export function Button({
     </Pressable>
   )
 }
-function btnTextColor(v: BtnVariant): string {
+function btnTextColor(v: BtnVariant, colors: Palette): string {
   if (v === 'outline') return colors.text
   if (v === 'ghost') return colors.brand
   return '#fff'
@@ -90,6 +94,7 @@ function btnTextColor(v: BtnVariant): string {
 
 /* --------------------------- Text field ------------------------- */
 export function Field({ label, children, hint }: { label?: string; children: React.ReactNode; hint?: string }) {
+  const styles = useStyles(makeStyles)
   return (
     <View style={{ gap: 6 }}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
@@ -100,6 +105,8 @@ export function Field({ label, children, hint }: { label?: string; children: Rea
 }
 
 export function Input({ label, hint, style, ...props }: TextInputProps & { label?: string; hint?: string }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const [focus, setFocus] = useState(false)
   return (
     <Field label={label} hint={hint}>
@@ -116,7 +123,9 @@ export function Input({ label, hint, style, ...props }: TextInputProps & { label
 
 /* ---------------------------- Status pill ----------------------- */
 export function StatusPill({ status }: { status: string }) {
-  const c = statusColor(status)
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
+  const c = statusColor(status, colors)
   return (
     <View style={[styles.pill, { backgroundColor: c.bg }]}>
       <Text style={[styles.pillText, { color: c.fg }]}>{status}</Text>
@@ -124,17 +133,23 @@ export function StatusPill({ status }: { status: string }) {
   )
 }
 
-export function Chip({ label, color = colors.brand, bg = colors.tintIndigo, icon }: { label: string; color?: string; bg?: string; icon?: keyof typeof Ionicons.glyphMap }) {
+export function Chip({ label, color, bg, icon }: { label: string; color?: string; bg?: string; icon?: keyof typeof Ionicons.glyphMap }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
+  const fg = color ?? colors.brand
+  const back = bg ?? colors.tintIndigo
   return (
-    <View style={[styles.chip, { backgroundColor: bg }]}>
-      {icon && <Ionicons name={icon} size={12} color={color} />}
-      <Text style={[styles.chipText, { color }]}>{label}</Text>
+    <View style={[styles.chip, { backgroundColor: back }]}>
+      {icon && <Ionicons name={icon} size={12} color={fg} />}
+      <Text style={[styles.chipText, { color: fg }]}>{label}</Text>
     </View>
   )
 }
 
 /* ---------------------------- Empty state ----------------------- */
 export function EmptyState({ icon = 'file-tray-outline', title, subtitle }: { icon?: keyof typeof Ionicons.glyphMap; title: string; subtitle?: string }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
@@ -147,26 +162,32 @@ export function EmptyState({ icon = 'file-tray-outline', title, subtitle }: { ic
 }
 
 /* ---------------------------- KPI card -------------------------- */
-export function KpiCard({ label, value, sub, icon, gradient = colors.gradBrand }: {
-  label: string; value: string; sub?: string; icon: keyof typeof Ionicons.glyphMap; gradient?: readonly string[]
+export function KpiCard({ label, value, sub, icon, gradient, onPress }: {
+  label: string; value: string; sub?: string; icon: keyof typeof Ionicons.glyphMap; gradient?: readonly string[]; onPress?: () => void
 }) {
-  return (
-    <LinearGradient colors={gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.kpi, shadow.card]}>
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
+  const inner = (
+    <LinearGradient colors={(gradient ?? colors.gradBrand) as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.kpi, shadow.card]}>
       <View style={styles.kpiIcon}>
         <Ionicons name={icon} size={18} color="#fff" />
       </View>
       <Text style={styles.kpiValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       <Text style={styles.kpiLabel}>{label}</Text>
       {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
+      {onPress ? <View style={styles.kpiChevron}><Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.9)" /></View> : null}
     </LinearGradient>
   )
+  if (onPress) return <Pressable style={{ flex: 1 }} onPress={onPress}>{inner}</Pressable>
+  return inner
 }
 
 /* --------------------------- Icon holder ------------------------ */
-export function IconBadge({ icon, color = colors.brand, bg = colors.tintIndigo, size = 40 }: { icon: keyof typeof Ionicons.glyphMap; color?: string; bg?: string; size?: number }) {
+export function IconBadge({ icon, color, bg, size = 40 }: { icon: keyof typeof Ionicons.glyphMap; color?: string; bg?: string; size?: number }) {
+  const { colors } = useTheme()
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 3, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={icon} size={size * 0.5} color={color} />
+    <View style={{ width: size, height: size, borderRadius: size / 3, backgroundColor: bg ?? colors.tintIndigo, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={icon} size={size * 0.5} color={color ?? colors.brand} />
     </View>
   )
 }
@@ -177,6 +198,8 @@ const ToastContext = createContext<(msg: string, kind?: ToastKind) => void>(() =
 export function useToast() { return useContext(ToastContext) }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const [msg, setMsg] = useState<{ text: string; kind: ToastKind } | null>(null)
   const opacity = useRef(new Animated.Value(0)).current
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -210,6 +233,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 /* ---------------------------- Confirm --------------------------- */
 export function useConfirm() {
+  const styles = useStyles(makeStyles)
   const [state, setState] = useState<{ message: string; resolve: (v: boolean) => void; danger?: boolean } | null>(null)
   const confirm = useCallback((message: string, danger = false) =>
     new Promise<boolean>((resolve) => setState({ message, resolve, danger })), [])
@@ -229,7 +253,7 @@ export function useConfirm() {
   return { confirm, node }
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   sectionTitle: { ...font.h3, color: colors.text },
@@ -237,7 +261,7 @@ const styles = StyleSheet.create({
   label: { ...font.small, color: colors.textMuted, fontWeight: '600' },
   hint: { fontSize: 11, color: colors.textFaint },
   input: { backgroundColor: colors.surfaceAlt, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: colors.text },
-  inputFocus: { borderColor: colors.brandLight, backgroundColor: '#fff' },
+  inputFocus: { borderColor: colors.brandLight, backgroundColor: colors.surface },
   pill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start' },
   pillText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.3 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill, alignSelf: 'flex-start' },
@@ -251,10 +275,11 @@ const styles = StyleSheet.create({
   kpiValue: { color: '#fff', fontSize: 22, fontWeight: '800' },
   kpiLabel: { color: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: '600' },
   kpiSub: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 2 },
+  kpiChevron: { position: 'absolute', top: 14, right: 12 },
   toast: { position: 'absolute', bottom: 34, left: 0, right: 0, alignItems: 'center', zIndex: 999 },
   toastInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.pill, ...shadow.float, maxWidth: '90%' },
   toastText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  confirmCard: { backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.xl, width: '100%', maxWidth: 380, ...shadow.float },
+  confirmCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, width: '100%', maxWidth: 380, ...shadow.float },
   confirmText: { ...font.body, color: colors.text, fontSize: 15, lineHeight: 22 },
 })

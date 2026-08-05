@@ -1,8 +1,10 @@
 // Supabase persistence. Mirrors the in-memory `Database` to Postgres tables.
 // Ported from the web app (row<->object mappers, load-all, seed, sync, deletes).
 
+import { createClient } from '@supabase/supabase-js'
 import type { Bill, Company, Customer, Database, Quotation, Settings, User } from './types'
 import { supabase } from './supabase'
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../config'
 import { seedDatabase } from './db'
 
 function db() {
@@ -17,9 +19,16 @@ function companyToRow(c: Company) {
     id: c.id, name: c.name, address: c.address, phone: c.phone, email: c.email ?? null,
     gstin: c.gstin ?? null, state_code: c.stateCode ?? null, logo_data_url: c.logoDataUrl ?? null,
     bank_details: c.bankDetails ?? null, upi_id: c.upiId ?? null, payee_name: c.payeeName ?? null,
+    signatory_name: c.signatoryName ?? null, signature_data_url: c.signatureDataUrl ?? null,
     invoice_prefix: c.invoicePrefix ?? null, quote_prefix: c.quotePrefix ?? null,
     accent: c.accent ?? null, accent2: c.accent2 ?? null, template: c.template ?? null,
-    font_family: c.fontFamily ?? null, terms: c.terms ?? null, handbooks: c.handbooks ?? [], is_active: c.isActive, updated_at: new Date().toISOString(),
+    font_family: c.fontFamily ?? null, terms: c.terms ?? null, handbooks: c.handbooks ?? [],
+    default_gst_mode: c.defaultGstMode ?? null, default_bill_type: c.defaultBillType ?? null,
+    default_simple_bill: c.defaultSimpleBill ?? null,
+    footer_image_data_url: c.footerImageDataUrl ?? null,
+    footer_image_width_mm: c.footerImageWidthMm ?? null,
+    footer_image_height_mm: c.footerImageHeightMm ?? null,
+    is_active: c.isActive, updated_at: new Date().toISOString(),
   }
 }
 function rowToCompany(r: any): Company {
@@ -27,9 +36,16 @@ function rowToCompany(r: any): Company {
     id: r.id, name: r.name, address: r.address ?? '', phone: r.phone ?? '', email: r.email ?? undefined,
     gstin: r.gstin ?? undefined, stateCode: r.state_code ?? undefined, logoDataUrl: r.logo_data_url ?? undefined,
     bankDetails: r.bank_details ?? undefined, upiId: r.upi_id ?? undefined, payeeName: r.payee_name ?? undefined,
+    signatoryName: r.signatory_name ?? undefined, signatureDataUrl: r.signature_data_url ?? undefined,
     invoicePrefix: r.invoice_prefix ?? undefined, quotePrefix: r.quote_prefix ?? undefined,
     accent: r.accent ?? undefined, accent2: r.accent2 ?? undefined, template: r.template ?? undefined,
-    fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, handbooks: r.handbooks ?? [], isActive: r.is_active ?? true,
+    fontFamily: r.font_family ?? undefined, terms: r.terms ?? undefined, handbooks: r.handbooks ?? [],
+    defaultGstMode: r.default_gst_mode ?? undefined, defaultBillType: r.default_bill_type ?? undefined,
+    defaultSimpleBill: r.default_simple_bill ?? undefined,
+    footerImageDataUrl: r.footer_image_data_url ?? undefined,
+    footerImageWidthMm: r.footer_image_width_mm ?? undefined,
+    footerImageHeightMm: r.footer_image_height_mm ?? undefined,
+    isActive: r.is_active ?? true,
   }
 }
 
@@ -46,7 +62,7 @@ function billToRow(b: Bill) {
     customer_type: b.customerType, customer_id: b.customerId ?? null, customer_name: b.customerName,
     customer_address: b.customerAddress, customer_phone: b.customerPhone, customer_gstin: b.customerGstin ?? null,
     items: b.items, discount_amount: b.discountAmount, discount_is_percent: b.discountIsPercent ?? false,
-    gst_enabled: b.gstEnabled ?? null, original_cost: b.originalCost ?? null, bill_type: b.billType ?? 'Online',
+    gst_enabled: b.gstEnabled ?? null, gst_inclusive: b.gstInclusive ?? null, simple_bill: b.simpleBill ?? null, original_cost: b.originalCost ?? null, bill_type: b.billType ?? 'Online',
     handbook_id: b.handbookId ?? null, hand_book_no: b.handBookNo ?? null, hand_bill_no: b.handBillNo ?? null,
     received_amount: b.receivedAmount, payments: b.payments, doc_status: b.docStatus,
     created_by: b.createdBy, created_at: b.createdAt, updated_at: b.updatedAt, deleted_at: b.deletedAt ?? null,
@@ -58,7 +74,7 @@ function rowToBill(r: any): Bill {
     customerType: r.customer_type, customerId: r.customer_id ?? undefined, customerName: r.customer_name ?? '',
     customerAddress: r.customer_address ?? '', customerPhone: r.customer_phone ?? '', customerGstin: r.customer_gstin ?? undefined,
     items: r.items ?? [], discountAmount: Number(r.discount_amount) || 0, discountIsPercent: r.discount_is_percent ?? false,
-    gstEnabled: r.gst_enabled ?? undefined, originalCost: r.original_cost ?? undefined, billType: r.bill_type ?? 'Online',
+    gstEnabled: r.gst_enabled ?? undefined, gstInclusive: r.gst_inclusive ?? undefined, simpleBill: r.simple_bill ?? undefined, originalCost: r.original_cost ?? undefined, billType: r.bill_type ?? 'Online',
     handbookId: r.handbook_id ?? undefined, handBookNo: r.hand_book_no ?? undefined, handBillNo: r.hand_bill_no ?? undefined,
     receivedAmount: Number(r.received_amount) || 0, payments: r.payments ?? [], docStatus: r.doc_status,
     createdBy: r.created_by ?? '', createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at ?? undefined,
@@ -71,7 +87,7 @@ function quoteToRow(q: Quotation) {
     customer_type: q.customerType, customer_id: q.customerId ?? null, customer_name: q.customerName,
     customer_address: q.customerAddress, customer_phone: q.customerPhone, customer_gstin: q.customerGstin ?? null,
     items: q.items, discount_amount: q.discountAmount, discount_is_percent: q.discountIsPercent ?? false,
-    gst_enabled: q.gstEnabled ?? null, original_cost: q.originalCost ?? null,
+    gst_enabled: q.gstEnabled ?? null, gst_inclusive: q.gstInclusive ?? null, original_cost: q.originalCost ?? null,
     status: q.status, valid_until: q.validUntil ?? null, converted_bill_id: q.convertedBillId ?? null,
     created_by: q.createdBy, created_at: q.createdAt, updated_at: q.updatedAt, deleted_at: q.deletedAt ?? null,
   }
@@ -82,7 +98,7 @@ function rowToQuote(r: any): Quotation {
     customerType: r.customer_type, customerId: r.customer_id ?? undefined, customerName: r.customer_name ?? '',
     customerAddress: r.customer_address ?? '', customerPhone: r.customer_phone ?? '', customerGstin: r.customer_gstin ?? undefined,
     items: r.items ?? [], discountAmount: Number(r.discount_amount) || 0, discountIsPercent: r.discount_is_percent ?? false,
-    gstEnabled: r.gst_enabled ?? undefined, originalCost: r.original_cost ?? undefined,
+    gstEnabled: r.gst_enabled ?? undefined, gstInclusive: r.gst_inclusive ?? undefined, originalCost: r.original_cost ?? undefined,
     status: r.status, validUntil: r.valid_until ?? undefined, convertedBillId: r.converted_bill_id ?? undefined,
     createdBy: r.created_by ?? '', createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at ?? undefined,
   }
@@ -105,15 +121,51 @@ export async function updateProfileRole(id: string, role: User['role'], name: st
 }
 
 export async function adminCreateUser(input: { name: string; email: string; password: string; role: User['role'] }) {
-  const { data, error } = await db().functions.invoke('admin-create-user', { body: input })
-  if (error) throw new Error(readFnError(error) || 'Could not create user')
-  if ((data as any)?.error) throw new Error((data as any).error)
+  // Preferred path: the admin-create-user Edge Function (creates a confirmed user
+  // + profile in one call). If it isn't deployed, fall back to a plain signUp on a
+  // throwaway client so a new login is still created without touching the admin's
+  // own session. The signup trigger (schema.sql) inserts the matching profile row.
+  const fn = await db().functions.invoke('admin-create-user', { body: input }).catch((e) => ({ data: null, error: e }))
+  if (!fn.error && !(fn.data as any)?.error) return
+  if (fn.error && !isFunctionMissing(fn.error)) {
+    throw new Error(readFnError(fn.error) || 'Could not create user')
+  }
+
+  // Fallback: isolated client, no session persistence, separate storage key so it
+  // never clobbers the signed-in admin.
+  const throwaway = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'magizhini.signup.tmp' },
+  })
+  const { data, error } = await throwaway.auth.signUp({
+    email: input.email,
+    password: input.password,
+    options: { data: { name: input.name, role: input.role } },
+  })
+  if (error) throw new Error(error.message)
+  const newId = data.user?.id
+  if (!newId) throw new Error('User created — they must confirm their email before signing in.')
+  // Ensure name/role land on the profile even if the DB trigger only sets defaults.
+  try { await db().from('profiles').update({ name: input.name, role: input.role }).eq('id', newId) } catch { /* trigger may cover this */ }
+}
+
+function isFunctionMissing(error: unknown): boolean {
+  const status = (error as { context?: { status?: number } })?.context?.status
+  const msg = ((error as Error)?.message ?? '').toLowerCase()
+  return status === 404 || msg.includes('not found') || msg.includes('failed to fetch') || msg.includes('failed to send')
 }
 
 export async function adminDeleteUser(id: string) {
-  const { data, error } = await db().functions.invoke('admin-create-user', { body: { action: 'delete', id } })
-  if (error) throw new Error(readFnError(error) || 'Could not delete user')
-  if ((data as any)?.error) throw new Error((data as any).error)
+  const fn = await db().functions.invoke('admin-create-user', { body: { action: 'delete', id } }).catch((e) => ({ data: null, error: e }))
+  // If the Edge Function is deployed and returned an error, throw it.
+  if (!isFunctionMissing(fn.error) && fn.error) throw new Error(readFnError(fn.error) || 'Could not delete user')
+  if ((fn.data as any)?.error) throw new Error((fn.data as any).error)
+  // If the function succeeded, we're done.
+  if (!fn.error) return
+  // Fallback: Edge Function is missing — remove the profile row only.
+  // The Supabase Auth user won't be removed via this path, but the app
+  // record is gone, so the user can no longer appear in the users list.
+  const { error: profileError } = await db().from('profiles').delete().eq('id', id)
+  if (profileError) throw new Error(profileError.message || 'Could not delete user')
 }
 
 function readFnError(error: unknown): string {
@@ -193,7 +245,7 @@ export async function syncAll(data: Database): Promise<void> {
   if (failed?.error) throw failed.error
 }
 
-export async function deleteRow(table: 'companies' | 'customers', id: string): Promise<void> {
+export async function deleteRow(table: 'companies' | 'customers' | 'bills' | 'quotations', id: string): Promise<void> {
   const { error } = await db().from(table).delete().eq('id', id)
   if (error) throw error
 }

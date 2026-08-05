@@ -150,9 +150,20 @@ async function signUpFallback(input: { name: string; email: string; password: st
 }
 
 export async function adminDeleteUser(id: string) {
-  const { data, error } = await db().functions.invoke('admin-create-user', { body: { action: 'delete', id } })
-  if (error) throw new Error(readFnError(error) || 'Could not delete user')
-  if ((data as any)?.error) throw new Error((data as any).error)
+  const fn = await db().functions.invoke('admin-create-user', { body: { action: 'delete', id } }).catch((e) => ({ data: null, error: e }))
+  // If the Edge Function is deployed and returned an error, throw it.
+  const isNotFound = ((fn.error as any)?.context?.status === 404) ||
+    ((fn.error as Error)?.message ?? '').toLowerCase().includes('not found') ||
+    ((fn.error as Error)?.message ?? '').toLowerCase().includes('failed to fetch')
+  if (!isNotFound && fn.error) throw new Error(readFnError(fn.error) || 'Could not delete user')
+  if ((fn.data as any)?.error) throw new Error((fn.data as any).error)
+  // If the function succeeded, we're done.
+  if (!fn.error) return
+  // Fallback: Edge Function is missing — remove the profile row only.
+  // The Supabase Auth user won't be removed via this path, but the app
+  // record is gone, so the user can no longer appear in the users list.
+  const { error: profileError } = await db().from('profiles').delete().eq('id', id)
+  if (profileError) throw new Error(profileError.message || 'Could not delete user')
 }
 
 function readFnError(error: unknown): string {
@@ -160,6 +171,7 @@ function readFnError(error: unknown): string {
   if (ctx?.status === 404) return 'The admin-create-user function is not deployed yet (see README).'
   return (error as Error)?.message ?? ''
 }
+
 
 /* ---------------- bulk load + first-run seed ---------------- */
 

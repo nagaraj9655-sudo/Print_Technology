@@ -32,6 +32,7 @@ interface ComputeInput {
   company: Company | undefined
   interState?: boolean
   gstEnabled?: boolean
+  gstInclusive?: boolean // true => entered rates already include GST
 }
 
 export function computeTotals(input: ComputeInput): Totals {
@@ -40,23 +41,37 @@ export function computeTotals(input: ComputeInput): Totals {
   const discount = round2(
     input.discountIsPercent ? (gross * (input.discountAmount || 0)) / 100 : input.discountAmount || 0,
   )
-  const taxable = round2(Math.max(0, gross - discount))
+  const afterDiscount = round2(Math.max(0, gross - discount))
 
   const gstMode = docUsesGst(input.company, input.gstEnabled)
+  const inclusive = gstMode && !!input.gstInclusive
   let tax = 0
   let cgst = 0
   let sgst = 0
   let igst = 0
+  let taxable = afterDiscount
 
   if (gstMode) {
+    // Discount applied proportionally across lines; per-line rates so mixes work.
     const discountRatio = gross > 0 ? discount / gross : 0
-    for (const it of input.items) {
-      const lt = lineTotal(it)
-      const lineTaxable = round2(lt * (1 - discountRatio))
-      const rate = it.taxRate ?? 0
-      tax += (lineTaxable * rate) / 100
+    if (inclusive) {
+      // Entered rates already include GST → back out the taxable value and tax.
+      let taxableSum = 0
+      for (const it of input.items) {
+        const lineIncl = round2(lineTotal(it) * (1 - discountRatio))
+        const rate = it.taxRate ?? 0
+        taxableSum += lineIncl / (1 + rate / 100)
+      }
+      taxable = round2(taxableSum)
+      tax = round2(afterDiscount - taxable) // reconciles: taxable + tax = afterDiscount
+    } else {
+      for (const it of input.items) {
+        const lineTaxable = round2(lineTotal(it) * (1 - discountRatio))
+        tax += (lineTaxable * (it.taxRate ?? 0)) / 100
+      }
+      tax = round2(tax)
+      taxable = afterDiscount
     }
-    tax = round2(tax)
     if (input.interState) {
       igst = tax
     } else {
@@ -65,7 +80,7 @@ export function computeTotals(input: ComputeInput): Totals {
     }
   }
 
-  const net = round2(taxable + tax)
+  const net = inclusive ? afterDiscount : round2(taxable + tax)
   const received = round2(input.receivedAmount ?? 0)
   const balance = round2(net - received)
 
@@ -100,6 +115,7 @@ export function billTotals(bill: Bill, company: Company | undefined): Totals {
     company,
     interState: recipientInterState(company, bill.customerGstin),
     gstEnabled: bill.gstEnabled,
+    gstInclusive: bill.gstInclusive,
   })
 }
 
@@ -112,6 +128,7 @@ export function quoteTotals(quote: Quotation, company: Company | undefined): Tot
     company,
     interState: recipientInterState(company, quote.customerGstin),
     gstEnabled: quote.gstEnabled,
+    gstInclusive: quote.gstInclusive,
   })
 }
 

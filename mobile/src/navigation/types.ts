@@ -11,6 +11,7 @@ export type RootStackParamList = {
   Reports: undefined
   Settings: undefined
   Users: undefined
+  RecycleBin: undefined
 }
 
 export type TabParamList = {

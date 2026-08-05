@@ -4,7 +4,10 @@ export type ID = string
 
 export type Role = 'Admin' | 'Operator'
 
-export type DocTemplate = 'modern' | 'classic' | 'minimal'
+export type DocTemplate = 'modern' | 'classic' | 'minimal' | 'elegant' | 'bold' | 'grid'
+
+// Tax mode chosen per document (default configurable per company).
+export type GstMode = 'inclusive' | 'exclusive' | 'none'
 
 export interface User {
   id: ID
@@ -37,6 +40,8 @@ export interface Company {
   bankDetails?: string
   upiId?: string
   payeeName?: string
+  signatoryName?: string
+  signatureDataUrl?: string
   invoicePrefix?: string
   quotePrefix?: string
   accent?: string
@@ -45,6 +50,12 @@ export interface Company {
   fontFamily?: string
   terms?: string
   handbooks?: Handbook[]
+  defaultGstMode?: GstMode
+  defaultBillType?: BillType
+  defaultSimpleBill?: boolean
+  footerImageDataUrl?: string
+  footerImageWidthMm?: number
+  footerImageHeightMm?: number
   isActive: boolean
 }
 
@@ -99,8 +110,10 @@ export interface Bill {
   discountAmount: number
   discountIsPercent?: boolean
   gstEnabled?: boolean
+  gstInclusive?: boolean
   originalCost?: number
   billType?: BillType
+  simpleBill?: boolean
   handbookId?: ID
   handBookNo?: string
   handBillNo?: string
@@ -131,6 +144,7 @@ export interface Quotation {
   discountAmount: number
   discountIsPercent?: boolean
   gstEnabled?: boolean
+  gstInclusive?: boolean
   originalCost?: number
   status: QuoteStatus
   validUntil?: string

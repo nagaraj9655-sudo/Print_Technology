@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useScopedBills, useScopedQuotes, useStore } from '../lib/store'
 import { billTotals, costBasis, quoteTotals } from '../lib/calc'
 import { daysBetween, formatDate, formatINR } from '../lib/format'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Card, EmptyState } from '../components/ui'
 import { Select } from '../components/Select'
 import { GradientHeader } from '../components/Header'
@@ -23,6 +23,8 @@ const TABS: { key: Tab; label: string }[] = [
 export function ReportsScreen() {
   const nav = useNavigation<Nav>()
   const { db, activeCompanyId } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const bills = useScopedBills()
   const quotes = useScopedQuotes()
   const [tab, setTab] = useState<Tab>('sales')
@@ -95,6 +97,8 @@ export function ReportsScreen() {
 type ShareFn = (title: string, headers: string[], rows: (string | number)[][]) => void
 
 function TableCard({ title, total, onShare, children }: { title: string; total?: string; onShare?: () => void; children: React.ReactNode }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   return (
     <Card padded={false} style={{ marginBottom: spacing.md }}>
       <View style={styles.cardHead}>
@@ -107,6 +111,8 @@ function TableCard({ title, total, onShare, children }: { title: string; total?:
   )
 }
 function LineRow({ a, b, c, danger, good }: { a: string; b: string; c: string; danger?: boolean; good?: boolean }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   return (
     <View style={styles.lineRow}>
       <View style={{ flex: 1 }}><Text style={styles.lineA}>{a}</Text><Text style={styles.lineB}>{b}</Text></View>
@@ -195,6 +201,7 @@ function CompanySummary({ companies, finalized, onShare }: { companies: any[]; f
   )
 }
 function Gst({ companies, finalized, onShare }: { companies: any[]; finalized: any[]; onShare: ShareFn }) {
+  const styles = useStyles(makeStyles)
   const rows = companies.filter((c) => c.gstin).map((c) => {
     const cb = finalized.filter((b) => b.companyId === c.id)
     let taxable = 0, cgst = 0, sgst = 0, igst = 0
@@ -212,16 +219,16 @@ function Gst({ companies, finalized, onShare }: { companies: any[]; finalized: a
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   tabsWrap: { paddingVertical: spacing.md },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
+  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   tabText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
   tabTextActive: { color: '#fff' },
   content: { paddingHorizontal: spacing.lg },
   filterRow: { flexDirection: 'row', gap: 12, marginBottom: spacing.md },
   filterLabel: { ...font.tiny, color: colors.textMuted, marginBottom: 5 },
-  filterInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: colors.text },
+  filterInput: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: colors.text },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   cardTitle: { ...font.h3, color: colors.text, flex: 1 },
   shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.tintIndigo, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },

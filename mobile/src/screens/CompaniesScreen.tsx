@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useStore, useScopedBills } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { formatINR } from '../lib/format'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { EmptyState } from '../components/ui'
 import { GradientHeader } from '../components/Header'
 import type { RootStackParamList } from '../navigation/types'
@@ -16,6 +16,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>
 export function CompaniesScreen() {
   const nav = useNavigation<Nav>()
   const { db } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
 
   const billedFor = (companyId: string) =>
     db.bills.filter((b) => !b.deletedAt && b.docStatus === 'Finalized' && b.companyId === companyId)
@@ -54,9 +56,9 @@ export function CompaniesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   list: { padding: spacing.lg, paddingBottom: 100, gap: 12 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   logo: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   logoText: { color: '#fff', fontSize: 24, fontWeight: '800' },
   name: { ...font.h3, color: colors.text },

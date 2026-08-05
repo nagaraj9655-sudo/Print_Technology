@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
-import { colors, font, radius } from '../theme'
+import { font, radius, useStyles, useTheme, type Palette } from '../theme'
 import { upiUri } from '../lib/payments'
 import { formatINR } from '../lib/format'
 
@@ -13,11 +13,12 @@ export function UpiQr({ upiId, payeeName, amount, note, size = 190 }: {
   note?: string
   size?: number
 }) {
+  const styles = useStyles(makeStyles)
   const uri = upiUri({ pa: upiId, pn: payeeName, am: amount, tn: note })
   return (
     <View style={styles.wrap}>
       <View style={styles.qrBox}>
-        <QRCode value={uri} size={size} backgroundColor="#fff" color={colors.text} />
+        <QRCode value={uri} size={size} backgroundColor="#fff" color="#0f172a" />
       </View>
       <Text style={styles.pa}>{upiId}</Text>
       {payeeName ? <Text style={styles.pn}>{payeeName}</Text> : null}
@@ -27,7 +28,7 @@ export function UpiQr({ upiId, payeeName, amount, note, size = 190 }: {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   wrap: { alignItems: 'center', gap: 4 },
   qrBox: { padding: 14, backgroundColor: '#fff', borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
   pa: { ...font.h3, color: colors.text, marginTop: 10 },

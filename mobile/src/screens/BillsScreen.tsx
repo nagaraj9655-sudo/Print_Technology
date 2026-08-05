@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useScopedBills, useStore } from '../lib/store'
 import { billTotals } from '../lib/calc'
 import { formatDate, formatINR } from '../lib/format'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { EmptyState, IconBadge, StatusPill } from '../components/ui'
 import { GradientHeader } from '../components/Header'
 import type { RootStackParamList } from '../navigation/types'
@@ -16,8 +16,11 @@ const FILTERS = ['All', 'Pending', 'Partial', 'Paid', 'Draft'] as const
 
 export function BillsScreen() {
   const nav = useNavigation<Nav>()
-  const { db } = useStore()
+  const { db, currentUser } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const bills = useScopedBills()
+  const deletedCount = db.bills.filter((b) => b.deletedAt).length
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All')
 
@@ -36,7 +39,16 @@ export function BillsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <GradientHeader title="Bills" subtitle={`${rows.length} invoice${rows.length === 1 ? '' : 's'}`} />
+      <GradientHeader
+        title="Bills"
+        subtitle={`${rows.length} invoice${rows.length === 1 ? '' : 's'}`}
+        right={currentUser?.role === 'Admin' ? (
+          <Pressable onPress={() => nav.navigate('RecycleBin')} hitSlop={8} style={styles.trashBtn}>
+            <Ionicons name="trash-outline" size={18} color="#fff" />
+            {deletedCount > 0 && <View style={styles.trashBadge}><Text style={styles.trashBadgeText}>{deletedCount}</Text></View>}
+          </Pressable>
+        ) : undefined}
+      />
 
       <View style={styles.searchWrap}>
         <View style={styles.search}>
@@ -83,20 +95,23 @@ export function BillsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   searchWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: colors.border },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 15, color: colors.text },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   filterChipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   filterText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
   filterTextActive: { color: '#fff' },
   list: { paddingHorizontal: spacing.lg, paddingBottom: 100, gap: 10 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   no: { ...font.body, color: colors.text, fontWeight: '800' },
   cust: { ...font.small, color: colors.textMuted, marginTop: 2 },
   date: { fontSize: 11, color: colors.textFaint, marginTop: 2 },
   amount: { ...font.h3, color: colors.text },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 60, height: 60, borderRadius: 20, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', ...shadow.float },
+  trashBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  trashBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  trashBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
 })

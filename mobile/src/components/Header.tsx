@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, font, shadow } from '../theme'
+import { font, shadow, useTheme } from '../theme'
 import { CompanySwitcher } from './CompanySwitcher'
 
 // Immersive gradient header used across the app.
@@ -17,8 +17,9 @@ export function GradientHeader({
   right?: React.ReactNode
 }) {
   const insets = useSafeAreaInsets()
+  const { colors } = useTheme()
   return (
-    <LinearGradient colors={colors.gradBrand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.wrap, { paddingTop: insets.top + 10 }, shadow.card]}>
+    <LinearGradient colors={colors.gradBrand as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.wrap, { paddingTop: insets.top + 10 }, shadow.card]}>
       <View style={styles.topRow}>
         <View style={styles.titleRow}>
           {onBack && (

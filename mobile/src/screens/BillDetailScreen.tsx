@@ -1,24 +1,30 @@
 import React, { useMemo, useState } from 'react'
-import { Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { billTotals, lineTotal, docUsesGst, recipientInterState } from '../lib/calc'
 import { amountInWords, formatDate, formatINR, todayISO } from '../lib/format'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { billHtml, docSummary } from '../lib/share'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Button, Card, IconBadge, Input, SectionTitle, StatusPill, useConfirm, useToast } from '../components/ui'
 import { GradientHeader } from '../components/Header'
 import { UpiQr } from '../components/UpiQr'
 import { PaymentReminder, type ReminderTarget } from '../components/PaymentReminder'
+import { ShareSheet, type ShareConfig } from '../components/ShareSheet'
 import type { RootStackParamList } from '../navigation/types'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
+const PAY_MODES = ['Cash', 'UPI', 'QR', 'Bank', 'Card'] as const
+
 export function BillDetailScreen() {
   const nav = useNavigation<Nav>()
   const route = useRoute<RouteProp<RootStackParamList, 'BillDetail'>>()
-  const { db, recordPayment, deleteBill, duplicateBill, updateBill, createBill } = useStore()
+  const { db, recordPayment, deleteBill, duplicateBill, updateBill } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const toast = useToast()
   const { confirm, node } = useConfirm()
 
@@ -28,9 +34,10 @@ export function BillDetailScreen() {
 
   const [payOpen, setPayOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [remind, setRemind] = useState<ReminderTarget | null>(null)
   const [payAmount, setPayAmount] = useState('')
-  const [payMode, setPayMode] = useState('UPI')
+  const [payMode, setPayMode] = useState<(typeof PAY_MODES)[number]>('Cash')
 
   if (!bill || !t) {
     return (
@@ -43,6 +50,19 @@ export function BillDetailScreen() {
 
   const gst = docUsesGst(company, bill.gstEnabled)
   const inter = recipientInterState(company, bill.customerGstin)
+  const simple = !!bill.simpleBill
+  const payNum = parseFloat(payAmount)
+  const isQr = payMode === 'QR'
+
+  const shareConfig: ShareConfig = {
+    title: `Invoice ${bill.companyBillNo}`,
+    phone: bill.customerPhone,
+    email: undefined,
+    buildHtml: () => billHtml(bill, company, db.settings),
+    fileName: `Invoice-${bill.companyBillNo}`.replace(/[^\w-]+/g, '-'),
+    summary: docSummary({ companyName: company?.name, isQuote: false, no: bill.companyBillNo, date: bill.date, net: t.net, balance: t.balance }),
+    emailSubject: `Invoice ${bill.companyBillNo}${company?.name ? ` from ${company.name}` : ''}`,
+  }
 
   const finalize = async () => {
     if (bill.docStatus === 'Finalized') return
@@ -52,17 +72,18 @@ export function BillDetailScreen() {
     }
   }
 
+  const openPayment = () => {
+    setPayAmount(t.balance > 0 ? String(Math.round(t.balance)) : '')
+    setPayMode('Cash')
+    setPayOpen(true)
+  }
+
   const savePayment = () => {
     const amt = parseFloat(payAmount)
     if (!amt || amt <= 0) return toast('Enter a valid amount', 'error')
-    recordPayment(bill.id, { date: todayISO(), amount: amt, mode: payMode })
+    if (isQr && !company?.upiId) return toast('Add a UPI ID to this company first', 'error')
+    recordPayment(bill.id, { date: todayISO(), amount: amt, mode: isQr ? 'UPI (QR)' : payMode })
     setPayOpen(false); setPayAmount(''); toast('Payment recorded')
-  }
-
-  const shareText = async () => {
-    const lines = bill.items.map((it) => `• ${it.description} — ${it.qty} × ${formatINR(it.rate)} = ${formatINR(lineTotal(it))}`).join('\n')
-    const msg = `${company?.name}\nInvoice ${bill.companyBillNo} · ${formatDate(bill.date)}\nTo: ${bill.customerName}\n\n${lines}\n\nTotal: ${formatINR(t.net)}\nReceived: ${formatINR(t.received)}\nBalance: ${formatINR(t.balance)}\n\n${amountInWords(t.net)}`
-    try { await Share.share({ message: msg }) } catch { /* cancelled */ }
   }
 
   const doDelete = async () => {
@@ -76,7 +97,7 @@ export function BillDetailScreen() {
         subtitle={company?.name}
         showCompany={false}
         onBack={() => nav.goBack()}
-        right={<Pressable onPress={shareText} hitSlop={8} style={styles.headerBtn}><Ionicons name="share-social" size={18} color="#fff" /></Pressable>}
+        right={<Pressable onPress={() => setShareOpen(true)} hitSlop={8} style={styles.headerBtn}><Ionicons name="share-social" size={18} color="#fff" /></Pressable>}
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Status + amount hero */}
@@ -87,9 +108,9 @@ export function BillDetailScreen() {
               <Text style={styles.heroAmount}>{formatINR(t.net)}</Text>
               <Text style={styles.words}>{amountInWords(t.net)}</Text>
             </View>
-            <StatusPill status={bill.docStatus === 'Draft' ? 'Draft' : t.status} />
+            <StatusPill status={bill.docStatus === 'Draft' ? 'Draft' : simple ? 'Paid' : t.status} />
           </View>
-          {t.balance > 0.001 && (
+          {!simple && t.balance > 0.001 && (
             <View style={styles.balanceRow}>
               <Text style={styles.balanceText}>Balance due: <Text style={{ fontWeight: '800' }}>{formatINR(t.balance)}</Text></Text>
             </View>
@@ -138,15 +159,15 @@ export function BillDetailScreen() {
           {gst && !inter && (<><TotalLine label="CGST" value={formatINR(t.cgst)} /><TotalLine label="SGST" value={formatINR(t.sgst)} /></>)}
           {gst && inter && <TotalLine label="IGST" value={formatINR(t.igst)} />}
           <View style={styles.grandRow}>
-            <Text style={styles.grandLabel}>Net Total</Text>
+            <Text style={styles.grandLabel}>{simple ? 'Total' : 'Net Total'}</Text>
             <Text style={styles.grandValue}>{formatINR(t.net)}</Text>
           </View>
-          <TotalLine label="Received" value={formatINR(t.received)} valueColor={colors.success} />
-          <TotalLine label="Balance" value={formatINR(t.balance)} valueColor={t.balance > 0.001 ? colors.danger : colors.success} bold />
+          {!simple && <TotalLine label="Received" value={formatINR(t.received)} valueColor={colors.success} />}
+          {!simple && <TotalLine label="Balance" value={formatINR(t.balance)} valueColor={t.balance > 0.001 ? colors.danger : colors.success} bold />}
         </Card>
 
         {/* Payments history */}
-        {bill.payments.length > 0 && (
+        {!simple && bill.payments.length > 0 && (
           <View style={{ marginTop: spacing.lg }}>
             <SectionTitle title="Payments" />
             <Card padded={false}>
@@ -166,8 +187,9 @@ export function BillDetailScreen() {
         {/* Actions */}
         <View style={styles.actionGrid}>
           {bill.docStatus === 'Draft' && <Button title="Finalize" icon="checkmark-done" onPress={finalize} style={{ flex: 1, minWidth: 150 }} />}
+          <Button title="Share" icon="share-social-outline" variant="outline" onPress={() => setShareOpen(true)} style={{ flex: 1, minWidth: 150 }} />
           <Button title="Edit" icon="create-outline" variant="outline" onPress={() => nav.navigate('BillForm', { id: bill.id })} style={{ flex: 1, minWidth: 150 }} />
-          {t.balance > 0.001 && <Button title="Record payment" icon="add-circle-outline" variant="success" onPress={() => setPayOpen(true)} style={{ flex: 1, minWidth: 150 }} />}
+          {t.balance > 0.001 && <Button title="Record payment" icon="add-circle-outline" variant="success" onPress={openPayment} style={{ flex: 1, minWidth: 150 }} />}
           {t.balance > 0.001 && company?.upiId && <Button title="Pay QR" icon="qr-code-outline" variant="outline" onPress={() => setQrOpen(true)} style={{ flex: 1, minWidth: 150 }} />}
           {t.balance > 0.001 && <Button title="Remind" icon="notifications-outline" variant="outline" onPress={() => setRemind({ customerId: bill.customerId, customerName: bill.customerName, customerPhone: bill.customerPhone })} style={{ flex: 1, minWidth: 150 }} />}
           <Button title="Duplicate" icon="copy-outline" variant="ghost" onPress={() => { const c = duplicateBill(bill.id); toast('Duplicated as draft'); nav.replace('BillDetail', { id: c.id }) }} style={{ flex: 1, minWidth: 150 }} />
@@ -176,29 +198,57 @@ export function BillDetailScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Record payment modal */}
+      {/* Record payment modal (with QR option) */}
       <Modal transparent visible={payOpen} animationType="fade" onRequestClose={() => setPayOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setPayOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Record payment</Text>
-            <Text style={styles.modalSub}>Balance due {formatINR(t.balance)}</Text>
-            <View style={{ gap: 12, marginTop: 14 }}>
-              <Input label="Amount" keyboardType="numeric" value={payAmount} onChangeText={setPayAmount} placeholder={String(t.balance)} />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {['UPI', 'Cash', 'Bank', 'Card'].map((m) => (
-                  <Pressable key={m} onPress={() => setPayMode(m)} style={[styles.modeChip, payMode === m && styles.modeChipActive]}>
-                    <Text style={[styles.modeText, payMode === m && { color: '#fff' }]}>{m}</Text>
-                  </Pressable>
-                ))}
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>Record payment</Text>
+              <Text style={styles.modalSub}>Balance due {formatINR(t.balance)}</Text>
+              <View style={{ gap: 12, marginTop: 14 }}>
+                <Input label="Amount received (₹)" keyboardType="numeric" value={payAmount} onChangeText={setPayAmount} placeholder={String(Math.round(t.balance))} />
+                <Text style={styles.modeLabel}>Payment mode</Text>
+                <View style={styles.modeWrap}>
+                  {PAY_MODES.map((m) => (
+                    <Pressable key={m} onPress={() => setPayMode(m)} style={[styles.modeChip, payMode === m && styles.modeChipActive]}>
+                      {m === 'QR' && <Ionicons name="qr-code" size={13} color={payMode === m ? '#fff' : colors.textMuted} />}
+                      <Text style={[styles.modeText, payMode === m && { color: '#fff' }]}>{m}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {isQr && (
+                  company?.upiId ? (
+                    payNum > 0 ? (
+                      <View style={styles.qrConfirm}>
+                        <UpiQr upiId={company.upiId} payeeName={company.payeeName ?? company.name} amount={payNum} note={`Invoice ${bill.companyBillNo}`} size={168} />
+                        <Text style={styles.qrHint}>Ask the buyer to scan and pay {formatINR(payNum)}. Once they confirm the payment, tap below to record it.</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.qrHint}>Enter the amount above to generate the QR.</Text>
+                    )
+                  ) : (
+                    <Text style={styles.qrWarn}>This company has no UPI ID. Add one in Companies to use QR payments.</Text>
+                  )
+                )}
+
+                {!isQr && <Pressable onPress={() => setPayAmount(String(Math.round(t.balance)))}><Text style={styles.fullLink}>Pay full balance</Text></Pressable>}
+                <Button
+                  title={isQr ? 'Confirm QR payment received' : 'Save payment'}
+                  icon={isQr ? 'checkmark-done-circle' : 'checkmark'}
+                  variant={isQr ? 'success' : 'primary'}
+                  onPress={savePayment}
+                  disabled={isQr && (!company?.upiId || !(payNum > 0))}
+                  full
+                />
+                <Button title="Cancel" variant="ghost" onPress={() => setPayOpen(false)} full />
               </View>
-              <Pressable onPress={() => setPayAmount(String(t.balance))}><Text style={styles.fullLink}>Pay full balance</Text></Pressable>
-              <Button title="Save payment" icon="checkmark" onPress={savePayment} full />
-            </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
 
-      {/* Pay QR modal */}
+      {/* Pay QR modal (standalone) */}
       <Modal transparent visible={qrOpen} animationType="fade" onRequestClose={() => setQrOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setQrOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
@@ -208,6 +258,7 @@ export function BillDetailScreen() {
         </Pressable>
       </Modal>
 
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} config={shareConfig} />
       <PaymentReminder open={!!remind} onClose={() => setRemind(null)} target={remind} />
       {node}
     </View>
@@ -215,7 +266,7 @@ export function BillDetailScreen() {
 }
 
 // Build a BillDraft from a bill (for finalize/update).
-function toDraft(b: NonNullable<ReturnType<typeof Object>> & any) {
+function toDraft(b: any) {
   return {
     companyId: b.companyId, date: b.date, customerType: b.customerType, customerId: b.customerId,
     customerName: b.customerName, customerAddress: b.customerAddress, customerPhone: b.customerPhone, customerGstin: b.customerGstin,
@@ -225,6 +276,7 @@ function toDraft(b: NonNullable<ReturnType<typeof Object>> & any) {
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
+  const styles = useStyles(makeStyles)
   return (
     <View style={{ flex: 1 }}>
       <Text style={styles.metaLabel}>{label}</Text>
@@ -233,6 +285,8 @@ function Meta({ label, value }: { label: string; value: string }) {
   )
 }
 function TotalLine({ label, value, valueColor, bold }: { label: string; value: string; valueColor?: string; bold?: boolean }) {
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   return (
     <View style={styles.totalLine}>
       <Text style={[styles.totalLineLabel, bold && { fontWeight: '800', color: colors.text }]}>{label}</Text>
@@ -241,7 +295,7 @@ function TotalLine({ label, value, valueColor, bold }: { label: string; value: s
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   content: { padding: spacing.lg, paddingTop: spacing.md },
   headerBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   heroLabel: { ...font.small, color: colors.textMuted },
@@ -267,11 +321,16 @@ const styles = StyleSheet.create({
   grandValue: { fontSize: 22, fontWeight: '800', color: colors.brand },
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: spacing.xl },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.xl, width: '100%', maxWidth: 380, ...shadow.float },
+  modalCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, width: '100%', maxWidth: 400, maxHeight: '88%', ...shadow.float },
   modalTitle: { ...font.h2, color: colors.text },
   modalSub: { ...font.small, color: colors.textMuted, marginTop: 2 },
-  modeChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  modeLabel: { ...font.small, color: colors.textMuted, fontWeight: '600' },
+  modeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  modeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
   modeChipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   modeText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
+  qrConfirm: { alignItems: 'center', backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, gap: 8 },
+  qrHint: { ...font.small, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
+  qrWarn: { ...font.small, color: colors.dangerDark, backgroundColor: colors.tintRose, padding: 10, borderRadius: radius.md },
   fullLink: { ...font.small, color: colors.brand, fontWeight: '700', textAlign: 'right' },
 })

@@ -1,13 +1,14 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
 import { canAccess } from '../lib/menus'
-import { colors, font } from '../theme'
+import { font, useTheme } from '../theme'
 import type { RootStackParamList, TabParamList } from './types'
 
 import { LoginScreen } from '../screens/LoginScreen'
@@ -26,23 +27,41 @@ import { CompanyFormScreen } from '../screens/CompanyFormScreen'
 import { ReportsScreen } from '../screens/ReportsScreen'
 import { SettingsScreen } from '../screens/SettingsScreen'
 import { UsersScreen } from '../screens/UsersScreen'
+import { RecycleBinScreen } from '../screens/RecycleBinScreen'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tab = createBottomTabNavigator<TabParamList>()
 
-const navTheme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.bg } }
+// Per-tab accent colors — makes the bar visually lively.
+const TAB_COLORS: Record<string, string> = {
+  Dashboard: '#6366f1', // indigo
+  Bills: '#10b981',     // emerald
+  Quotations: '#f59e0b', // amber
+  More: '#8b5cf6',      // violet
+}
 
 function Tabs() {
   const { currentUser } = useStore()
+  const { colors } = useTheme()
+  const insets = useSafeAreaInsets()
   const allowed = (key: string) => canAccess(currentUser?.role ?? 'Operator', currentUser?.allowedMenus, key)
+  // Lift the bar above the Android gesture/nav bar so tabs are never hidden.
+  const bottomInset = Math.max(insets.bottom, 8)
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.brand,
+        tabBarActiveTintColor: TAB_COLORS[route.name] ?? colors.brand,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          height: 58 + bottomInset,
+          paddingBottom: bottomInset,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
         tabBarIcon: ({ color, focused }) => {
           const map: Record<string, keyof typeof Ionicons.glyphMap> = {
             Dashboard: focused ? 'grid' : 'grid-outline',
@@ -64,6 +83,11 @@ function Tabs() {
 
 export function RootNavigator() {
   const { ready, currentUser } = useStore()
+  const { colors } = useTheme()
+  const navTheme = useMemo(
+    () => ({ ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.brand } }),
+    [colors],
+  )
 
   if (!ready) return <Splash />
 
@@ -72,7 +96,7 @@ export function RootNavigator() {
       {!currentUser ? (
         <LoginScreen />
       ) : (
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="Tabs" component={Tabs} />
           <Stack.Screen name="BillForm" component={BillFormScreen} />
           <Stack.Screen name="BillDetail" component={BillDetailScreen} />
@@ -85,6 +109,7 @@ export function RootNavigator() {
           <Stack.Screen name="Reports" component={ReportsScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Users" component={UsersScreen} />
+          <Stack.Screen name="RecycleBin" component={RecycleBinScreen} />
         </Stack.Navigator>
       )}
     </NavigationContainer>
@@ -92,8 +117,9 @@ export function RootNavigator() {
 }
 
 function Splash() {
+  const { colors } = useTheme()
   return (
-    <LinearGradient colors={colors.gradBrand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splash}>
+    <LinearGradient colors={colors.gradBrand as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splash}>
       <View style={styles.logo}>
         <Text style={styles.logoText}>M</Text>
       </View>
@@ -105,7 +131,6 @@ function Splash() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: { backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, height: 62, paddingBottom: 8, paddingTop: 6 },
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 84, height: 84, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   logoText: { color: '#fff', fontSize: 46, fontWeight: '800' },

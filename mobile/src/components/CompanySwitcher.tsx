@@ -2,11 +2,13 @@ import React, { useState } from 'react'
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '../lib/store'
-import { colors, font, radius, shadow, spacing } from '../theme'
+import { font, radius, shadow, spacing, useStyles, useTheme, type Palette } from '../theme'
 
 // Compact pill for the header that switches the active company (or "All").
 export function CompanySwitcher() {
   const { db, activeCompanyId, setActiveCompanyId } = useStore()
+  const { colors } = useTheme()
+  const styles = useStyles(makeStyles)
   const [open, setOpen] = useState(false)
   const label = activeCompanyId === 'ALL' ? 'All companies' : db.companies.find((c) => c.id === activeCompanyId)?.name ?? 'Select'
 
@@ -51,11 +53,11 @@ export function CompanySwitcher() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, maxWidth: 200 },
   pillText: { color: '#fff', fontWeight: '700', fontSize: 13, flexShrink: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: 34, maxHeight: '70%', ...shadow.float },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: 34, maxHeight: '70%', ...shadow.float },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, marginBottom: 12 },
   sheetTitle: { ...font.h3, color: colors.text, marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 10, borderRadius: radius.md },
