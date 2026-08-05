@@ -122,11 +122,12 @@ export async function updateProfileRole(id: string, role: User['role'], name: st
 
 export async function adminCreateUser(input: { name: string; email: string; password: string; role: User['role'] }) {
   // Preferred path: the admin-create-user Edge Function (creates a confirmed user
-  // + profile in one call). If it isn't deployed, fall back to a plain signUp on a
-  // throwaway client so a new login is still created without touching the admin's
-  // own session. The signup trigger (schema.sql) inserts the matching profile row.
+  // + profile in one call, no email sent, no rate limit). If it isn't deployed,
+  // fall back to a plain signUp on a throwaway client.
   const fn = await db().functions.invoke('admin-create-user', { body: input }).catch((e) => ({ data: null, error: e }))
   if (!fn.error && !(fn.data as any)?.error) return
+  // Edge Function ran but returned an application-level error — surface it.
+  if (!fn.error && (fn.data as any)?.error) throw new Error((fn.data as any).error)
   if (fn.error && !isFunctionMissing(fn.error)) {
     throw new Error(readFnError(fn.error) || 'Could not create user')
   }
@@ -141,7 +142,19 @@ export async function adminCreateUser(input: { name: string; email: string; pass
     password: input.password,
     options: { data: { name: input.name, role: input.role } },
   })
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Email rate limit hits when the Edge Function isn't deployed and Supabase's
+    // free-tier email quota is exhausted. Show an actionable message.
+    if (error.message.toLowerCase().includes('rate limit') ||
+        error.message.toLowerCase().includes('over_email_send_rate_limit')) {
+      throw new Error(
+        'Email rate limit exceeded.\n\n' +
+        'Fix: Go to Supabase Dashboard → Authentication → Email → turn OFF \'Confirm email\'.' +
+        '\n\nOr ask your admin to deploy the admin-create-user Edge Function.'
+      )
+    }
+    throw new Error(error.message)
+  }
   const newId = data.user?.id
   if (!newId) throw new Error('User created — they must confirm their email before signing in.')
   // Ensure name/role land on the profile even if the DB trigger only sets defaults.
@@ -151,7 +164,13 @@ export async function adminCreateUser(input: { name: string; email: string; pass
 function isFunctionMissing(error: unknown): boolean {
   const status = (error as { context?: { status?: number } })?.context?.status
   const msg = ((error as Error)?.message ?? '').toLowerCase()
-  return status === 404 || msg.includes('not found') || msg.includes('failed to fetch') || msg.includes('failed to send')
+  return (
+    status === 404 ||
+    msg.includes('not found') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('failed to send') ||
+    msg.includes('failed to send a request')
+  )
 }
 
 export async function adminDeleteUser(id: string) {

@@ -121,14 +121,17 @@ export async function updateProfileRole(id: string, role: User['role'], name: st
 }
 
 // Create a real login account. Prefers the admin Edge Function (auto-confirms the
-// email). If that isn't deployed, falls back to a normal sign-up performed on a
-// throwaway client so the current Admin's session is never replaced.
+// email, no rate limits). If that isn't deployed, falls back to a normal sign-up
+// performed on a throwaway client so the current Admin's session is never replaced.
 export async function adminCreateUser(input: { name: string; email: string; password: string; role: User['role'] }) {
   const res = await db()
     .functions.invoke('admin-create-user', { body: input })
     .catch((e) => ({ data: null as any, error: e }))
 
-  if (!res.error && !(res.data as any)?.error) return // Edge Function succeeded
+  // Edge Function succeeded with no error.
+  if (!res.error && !(res.data as any)?.error) return
+  // Edge Function ran but returned an application-level error — surface it.
+  if (!res.error && (res.data as any)?.error) throw new Error((res.data as any).error)
 
   // Fallback: sign the user up via a secondary client (does not touch the admin session).
   await signUpFallback(input)
@@ -146,7 +149,21 @@ async function signUpFallback(input: { name: string; email: string; password: st
     password: input.password,
     options: { data: { name: input.name, role: input.role } },
   })
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Email rate limit is a Supabase free-tier restriction on the signUp fallback.
+    // The proper fix is to deploy the admin-create-user Edge Function which uses
+    // the Admin API and never sends confirmation emails.
+    if (error.message.toLowerCase().includes('email rate limit') ||
+        error.message.toLowerCase().includes('rate limit') ||
+        error.message.toLowerCase().includes('over_email_send_rate_limit')) {
+      throw new Error(
+        'Email rate limit exceeded. To fix this permanently:\n' +
+        '1. Deploy the admin-create-user Edge Function (see supabase/functions/), OR\n' +
+        '2. Go to Supabase Dashboard → Authentication → Email → Disable \'Confirm email\'.'
+      )
+    }
+    throw new Error(error.message)
+  }
 }
 
 export async function adminDeleteUser(id: string) {
