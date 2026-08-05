@@ -211,15 +211,26 @@ export async function emailPdf(opts: { to?: string; subject: string; body: strin
 /** Open a WhatsApp chat with prefilled text. Uses the buyer's number when given. */
 export async function openWhatsApp(phone: string | undefined, text: string): Promise<boolean> {
   const num = phone ? normalizePhone(phone) : ''
-  const url = num
+  // Prefer the native whatsapp:// scheme (works when WhatsApp is installed).
+  // On Android 11+ the scheme query is now declared in AndroidManifest so
+  // canOpenURL will correctly return true when WhatsApp is present.
+  const nativeUrl = num
     ? `whatsapp://send?phone=${num}&text=${encodeURIComponent(text)}`
     : `whatsapp://send?text=${encodeURIComponent(text)}`
-  const web = num ? `https://wa.me/${num}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`
+  const webUrl = num
+    ? `https://wa.me/${num}?text=${encodeURIComponent(text)}`
+    : `https://wa.me/?text=${encodeURIComponent(text)}`
   try {
-    if (await Linking.canOpenURL(url)) { await Linking.openURL(url); return true }
-    await Linking.openURL(web); return true
+    if (await Linking.canOpenURL(nativeUrl)) {
+      await Linking.openURL(nativeUrl)
+      return true
+    }
+    // Fallback: use the wa.me web URL which Android will still route to WhatsApp
+    // if installed, or open in the browser as a fallback.
+    await Linking.openURL(webUrl)
+    return true
   } catch {
-    try { await Linking.openURL(web); return true } catch { return false }
+    try { await Linking.openURL(webUrl); return true } catch { return false }
   }
 }
 
