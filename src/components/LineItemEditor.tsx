@@ -5,6 +5,7 @@ import { formatINR } from '../lib/format'
 import { lineTotal } from '../lib/calc'
 import { uid } from '../lib/db'
 import { useStore } from '../lib/store'
+import { AutocompleteInput } from './AutocompleteInput'
 
 interface Props {
   items: LineItem[]
@@ -49,11 +50,6 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200">
-      <datalist id="past-descriptions">
-        {pastDescriptions.map((desc) => (
-          <option key={desc} value={desc} />
-        ))}
-      </datalist>
       <table className="w-full">
         <thead className="bg-slate-50">
           <tr>
@@ -75,13 +71,13 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
               <tr key={it.id} className="hover:bg-slate-50/50">
                 <td className="td text-center text-slate-400">{idx + 1}</td>
                 <td className="td">
-                  <input
+                  <AutocompleteInput
                     className="input"
-                    list="past-descriptions"
                     value={it.description}
                     placeholder="Service / item description"
-                    onChange={(e) => update(it.id, { description: e.target.value })}
-                    onKeyDown={(e) => onKeyDown(e, isLast)}
+                    suggestions={pastDescriptions}
+                    onChange={(v) => update(it.id, { description: v })}
+                    onEnter={() => isLast && addRow()}
                   />
                 </td>
                 {gstMode && (

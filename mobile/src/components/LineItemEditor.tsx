@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { LineItem } from '../lib/types'
 import { lineTotal } from '../lib/calc'
 import { formatINR } from '../lib/format'
 import { uid } from '../lib/db'
+import { useStore } from '../lib/store'
 import { font, radius, spacing, useStyles, useTheme, type Palette } from '../theme'
 import { Select } from './Select'
 
@@ -19,9 +20,26 @@ export function LineItemEditor({
 }) {
   const { colors } = useTheme()
   const styles = useStyles(makeStyles)
+  const { db } = useStore()
+  const [focusedId, setFocusedId] = useState<string | null>(null)
   const update = (id: string, patch: Partial<LineItem>) => onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
   const remove = (id: string) => onChange(items.filter((it) => it.id !== id))
   const add = () => onChange([...items, { id: uid(), description: '', qty: 1, rate: 0, taxRate: gstMode ? taxRates[taxRates.length - 1] ?? 18 : undefined }])
+
+  // Unique descriptions used on past bills/quotes — offered as you type.
+  const pastDescriptions = useMemo(() => {
+    const set = new Set<string>()
+    db.bills.forEach((b) => b.items.forEach((i) => i.description && set.add(i.description.trim())))
+    db.quotations.forEach((q) => q.items.forEach((i) => i.description && set.add(i.description.trim())))
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b))
+  }, [db.bills, db.quotations])
+
+  const suggestionsFor = (it: LineItem) => {
+    if (focusedId !== it.id) return []
+    const q = it.description.trim().toLowerCase()
+    if (!q) return []
+    return pastDescriptions.filter((d) => d.toLowerCase().includes(q) && d.toLowerCase() !== q).slice(0, 6)
+  }
 
   const num = (v: string) => {
     const n = parseFloat(v.replace(/[^0-9.]/g, ''))
@@ -44,9 +62,25 @@ export function LineItemEditor({
             placeholderTextColor={colors.textFaint}
             value={it.description}
             onChangeText={(t) => update(it.id, { description: t })}
+            onFocus={() => setFocusedId(it.id)}
+            onBlur={() => setFocusedId((f) => (f === it.id ? null : f))}
             style={styles.desc}
             multiline
           />
+          {suggestionsFor(it).length > 0 && (
+            <View style={styles.suggestBox}>
+              {suggestionsFor(it).map((s) => (
+                <Pressable
+                  key={s}
+                  style={styles.suggestRow}
+                  onPress={() => { update(it.id, { description: s }); setFocusedId(null) }}
+                >
+                  <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                  <Text style={styles.suggestText} numberOfLines={1}>{s}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           <View style={styles.row}>
             <MiniField label="Qty">
@@ -110,6 +144,9 @@ const makeStyles = (colors: Palette) => StyleSheet.create({
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   idx: { ...font.tiny, color: colors.brand, textTransform: 'uppercase', letterSpacing: 0.4 },
   desc: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, padding: 10, fontSize: 14, color: colors.text, minHeight: 40 },
+  suggestBox: { marginTop: -4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.brandLight, borderRadius: radius.md, overflow: 'hidden' },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  suggestText: { ...font.body, color: colors.text, flex: 1 },
   row: { flexDirection: 'row', gap: 10 },
   mini: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: colors.text },
   miniLabel: { ...font.tiny, color: colors.textMuted },
