@@ -474,18 +474,18 @@ function MinimalTemplate({ ctx }: { ctx: Ctx }) {
     <div className="border-l-[6px] p-8 print:p-2" style={{ borderColor: accent }}>
       {showHeader ? (
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-12 w-12 object-contain" />}
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">{company?.name}</h1>
-              <p className="max-w-xs text-xs text-slate-700">{company?.address}</p>
-              <p className="text-xs text-slate-700">{company?.phone}{gst && <> · GSTIN {company?.gstin}</>}</p>
-            </div>
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">{company?.name}</h1>
+            <p className="max-w-xs text-xs text-slate-700">{company?.address}</p>
+            <p className="text-xs text-slate-700">{company?.phone}{gst && <> · GSTIN {company?.gstin}</>}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-widest text-slate-600">{title}</p>
-            <p className="text-lg font-bold" style={{ color: accent }}>{docNo}</p>
-            <p className="text-xs text-slate-700">{formatDate(doc.date)}</p>
+          <div className="flex items-start gap-3">
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-widest text-slate-600">{title}</p>
+              <p className="text-lg font-bold" style={{ color: accent }}>{docNo}</p>
+              <p className="text-xs text-slate-700">{formatDate(doc.date)}</p>
+            </div>
+            {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-12 w-12 object-contain" />}
           </div>
         </div>
       ) : (
@@ -529,17 +529,12 @@ function ElegantTemplate({ ctx }: { ctx: Ctx }) {
   return (
     <div className="m-3 border p-6 print:m-1 print:p-4" style={{ borderColor: accent }}>
       {showHeader ? (
-        <div className="flex items-end justify-between border-b pb-4" style={{ borderColor: accent }}>
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.4em] text-slate-600">{isBill ? 'Invoice' : 'Quotation'}</p>
-            <h1 className="text-3xl font-bold text-slate-900">{company?.name}</h1>
-            <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-700">{company?.address}</p>
-          </div>
-          <div className="text-right text-xs text-slate-700">
-            {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="ml-auto mb-1 h-14 w-14 object-contain" />}
-            <p>{company?.phone}</p>{company?.email && <p>{company.email}</p>}
-            {gst && <p className="font-semibold">GSTIN: {company?.gstin}</p>}
-          </div>
+        <div className="border-b pb-4 text-center" style={{ borderColor: accent }}>
+          {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="mx-auto mb-2 h-16 w-16 object-contain" />}
+          <p className="text-[10px] uppercase tracking-[0.4em] text-slate-600">{isBill ? 'Invoice' : 'Quotation'}</p>
+          <h1 className="text-3xl font-bold text-slate-900">{company?.name}</h1>
+          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-slate-700">{company?.address}</p>
+          <p className="mt-0.5 text-xs text-slate-700">{company?.phone}{company?.email && <> · {company.email}</>}{gst && <> · GSTIN: {company?.gstin}</>}</p>
         </div>
       ) : <LetterheadSpacer mm={topMm} />}
 
@@ -637,14 +632,12 @@ function GridTemplate({ ctx }: { ctx: Ctx }) {
           <div className="border-b-2 px-3 py-2 text-center text-sm font-bold uppercase tracking-widest" style={{ borderColor: accent, color: accent }}>{title}</div>
           <div className="grid grid-cols-2">
             <div className="border-r px-3 py-2" style={{ borderColor: accent }}>
-              <div className="flex items-center gap-2">
-                {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-10 w-10 object-contain" />}
-                <p className="font-bold text-slate-900">{company?.name}</p>
-              </div>
+              <p className="font-bold text-slate-900">{company?.name}</p>
               <p className="mt-1 text-xs text-slate-700">{company?.address}</p>
               <p className="text-xs text-slate-700">☎ {company?.phone}{gst && <> · GSTIN: {company?.gstin}</>}</p>
             </div>
             <div className="px-3 py-2 text-xs">
+              {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="ml-auto mb-1 h-10 w-10 object-contain" />}
               <div className="flex justify-between"><span className="text-slate-600">{isBill ? 'Invoice No' : 'Quote No'}</span><span className="font-bold text-slate-900">{docNo}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">Date</span><span className="text-slate-800">{formatDate(doc.date)}</span></div>
               {validUntil && <div className="flex justify-between"><span className="text-slate-600">Valid Until</span><span className="text-slate-800">{formatDate(validUntil)}</span></div>}
