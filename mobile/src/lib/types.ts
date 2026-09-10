@@ -114,6 +114,7 @@ export interface Bill {
   originalCost?: number
   billType?: BillType
   simpleBill?: boolean
+  taxInvoice?: boolean // print in the formal GST tax-invoice format (per-line CGST/SGST)
   handbookId?: ID
   handBookNo?: string
   handBillNo?: string

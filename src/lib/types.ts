@@ -123,6 +123,7 @@ export interface Bill {
   originalCost?: number // whole-document manual cost — NEVER printed; profit report only
   billType?: BillType // Online (system-numbered) | Handbill (manual paper book)
   simpleBill?: boolean // true = plain/cash bill: no received/balance/payment shown, treated as paid
+  taxInvoice?: boolean // true = print this bill in the formal GST tax-invoice format (per-line CGST/SGST), overriding the company template
   handbookId?: ID // which manual book (Handbill)
   handBookNo?: string // editable book number on the receipt (Handbill)
   handBillNo?: string // editable receipt/bill number within the book (Handbill)

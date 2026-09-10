@@ -101,6 +101,7 @@ export interface BillDraft {
   originalCost?: number
   billType?: Bill['billType']
   simpleBill?: boolean
+  taxInvoice?: boolean
   handbookId?: string
   handBookNo?: string
   handBillNo?: string
@@ -439,6 +440,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     originalCost: draft.originalCost,
     billType: draft.billType ?? 'Online',
     simpleBill: draft.simpleBill,
+    taxInvoice: draft.taxInvoice,
     handbookId: draft.handbookId,
     handBookNo: draft.handBookNo,
     handBillNo: draft.handBillNo,

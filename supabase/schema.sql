@@ -116,6 +116,7 @@ create table if not exists public.bills (
   gst_enabled         boolean,
   gst_inclusive       boolean,
   simple_bill         boolean,
+  tax_invoice         boolean,
   original_cost       numeric,
   bill_type           text default 'Online',
   handbook_id         uuid,
@@ -174,6 +175,7 @@ create table if not exists public.counters (
 -- Upgrade-safe columns for existing projects
 alter table public.bills add column if not exists gst_inclusive boolean;
 alter table public.bills add column if not exists simple_bill boolean;
+alter table public.bills add column if not exists tax_invoice boolean;
 alter table public.quotations add column if not exists gst_inclusive boolean;
 
 -- ---------- Row-level security ----------------------------------------------

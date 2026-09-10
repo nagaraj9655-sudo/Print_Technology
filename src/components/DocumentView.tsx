@@ -76,7 +76,10 @@ export function DocumentView(props: DocViewProps) {
   const validUntil = !isBill ? (doc as Quotation).validUntil : undefined
   const topMm = (isBill ? settings.letterpadBillTopMm : settings.letterpadQuoteTopMm) ?? 40
   const inclusive = gst && !!doc.gstInclusive
-  const template: DocTemplate = company?.template ?? 'modern'
+  // A bill flagged as a tax invoice always prints in the formal GST layout,
+  // regardless of the company's default template.
+  const template: DocTemplate =
+    isBill && (doc as Bill).taxInvoice ? 'tax' : company?.template ?? 'modern'
   const simpleBill = isBill && !!(doc as Bill).simpleBill
 
   const ctx: Ctx = { doc, company, kind, settings, showHeader, gst, accent, accent2, isBill, t, title, docNo, interState, validUntil, topMm, inclusive, template, simpleBill }

@@ -38,13 +38,15 @@ export function buildDocHtml(opts: {
   interState: boolean
   footer?: string
   simple?: boolean
+  taxFormat?: boolean // force the formal GST tax-invoice layout for this document
 }): string {
-  const { company, meta, customer, items, totals, gst, interState, footer, simple } = opts
+  const { company, meta, customer, items, totals, gst, interState, footer, simple, taxFormat } = opts
   const accent = company?.accent || '#4f46e5'
   const title = meta.isQuote ? 'QUOTATION' : (gst ? 'TAX INVOICE' : 'INVOICE')
 
-  // Formal Tally/Busy-style GST tax invoice (per-line CGST/SGST columns).
-  if (company?.template === 'tax') return buildTaxInvoiceHtml(opts, title, accent)
+  // Formal Tally/Busy-style GST tax invoice (per-line CGST/SGST columns) — chosen
+  // per bill (taxFormat) or as the company's default template.
+  if (taxFormat || company?.template === 'tax') return buildTaxInvoiceHtml(opts, title, accent)
 
   const itemRows = items.map((it, i) => `
     <tr>
@@ -347,6 +349,7 @@ export function billHtml(bill: Bill, company: Company | undefined, settings?: Se
     interState: recipientInterState(company, bill.customerGstin),
     footer: settings?.invoiceFooter,
     simple: bill.simpleBill,
+    taxFormat: bill.taxInvoice,
   })
 }
 

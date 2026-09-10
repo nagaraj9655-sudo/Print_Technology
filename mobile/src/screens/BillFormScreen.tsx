@@ -46,6 +46,7 @@ export function BillFormScreen() {
     existing ? (existing.gstEnabled === false ? 'none' : existing.gstInclusive ? 'inclusive' : 'exclusive') : 'exclusive',
   )
   const [simpleBill, setSimpleBill] = useState(existing?.simpleBill ?? false)
+  const [taxInvoice, setTaxInvoice] = useState(existing?.taxInvoice ?? false)
   const [receivedAmount, setReceivedAmount] = useState(String(existing?.receivedAmount ?? ''))
   const [billType, setBillType] = useState<'Online' | 'Handbill'>(existing?.billType ?? 'Online')
   const [handbookId, setHandbookId] = useState<string | undefined>(existing?.handbookId)
@@ -123,7 +124,7 @@ export function BillFormScreen() {
       items: items.filter((it) => it.description.trim()), discountAmount: num(discountAmount), discountIsPercent,
       // simpleBill is a print-only flag — payment tracking is always independent (matches web app).
       receivedAmount: num(receivedAmount),
-      gstEnabled, gstInclusive, simpleBill, originalCost: originalCost || undefined,
+      gstEnabled, gstInclusive, simpleBill, taxInvoice, originalCost: originalCost || undefined,
       billType, handbookId, handBookNo, handBillNo,
       companyBillNoOverride: billType !== 'Handbill' && numberOverride.trim() ? numberOverride.trim() : undefined,
     }
@@ -179,12 +180,23 @@ export function BillFormScreen() {
             <View>
               <Text style={styles.fieldLabel}>Bill format</Text>
               <View style={styles.segment}>
-                {([['Standard', false], ['Simple (cash)', true]] as const).map(([lbl, val]) => (
-                  <Pressable key={lbl} onPress={() => setSimpleBill(val)} style={[styles.segmentBtn, simpleBill === val && styles.segmentActive]}>
-                    <Text style={[styles.segmentText, simpleBill === val && styles.segmentTextActive]}>{lbl}</Text>
-                  </Pressable>
-                ))}
+                {([['Standard', 'standard'], ['Simple (cash)', 'simple'], ['Tax Invoice', 'tax']] as const).map(([lbl, mode]) => {
+                  const active = mode === 'tax' ? taxInvoice : mode === 'simple' ? simpleBill && !taxInvoice : !simpleBill && !taxInvoice
+                  return (
+                    <Pressable
+                      key={lbl}
+                      onPress={() => {
+                        setTaxInvoice(mode === 'tax')
+                        setSimpleBill(mode === 'simple')
+                      }}
+                      style={[styles.segmentBtn, active && styles.segmentActive]}
+                    >
+                      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{lbl}</Text>
+                    </Pressable>
+                  )
+                })}
               </View>
+              {taxInvoice && <Text style={styles.hint}>Formal GST tax invoice — per-line CGST/SGST columns.</Text>}
             </View>
           </Card>
 
@@ -315,6 +327,7 @@ const makeStyles = (colors: Palette) => StyleSheet.create({
   segmentText: { ...font.small, color: colors.textMuted, fontWeight: '700' },
   segmentTextActive: { color: '#fff' },
   fieldLabel: { ...font.small, color: colors.textMuted, fontWeight: '600', marginBottom: 6 },
+  hint: { ...font.small, color: colors.brand, marginTop: 6 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.lg, ...shadow.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   toggleLabel: { ...font.body, color: colors.text, fontWeight: '700' },
   toggleSub: { ...font.small, color: colors.textFaint, marginTop: 2 },

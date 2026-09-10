@@ -59,6 +59,8 @@ export default function BillForm() {
   const [billType, setBillType] = useState<BillType>(existing?.billType ?? initialCompany?.defaultBillType ?? 'Online')
   // Standard bill (with received/balance) vs Simple/cash bill (no payment shown, treated as paid).
   const [simpleBill, setSimpleBill] = useState(existing?.simpleBill ?? initialCompany?.defaultSimpleBill ?? false)
+  // Print this bill in the formal GST tax-invoice format (per-line CGST/SGST).
+  const [taxInvoice, setTaxInvoice] = useState(existing?.taxInvoice ?? false)
   const [handbookId, setHandbookId] = useState(existing?.handbookId ?? '')
   const [handBookNo, setHandBookNo] = useState(existing?.handBookNo ?? '')
   const [handBillNo, setHandBillNo] = useState(existing?.handBillNo ?? '')
@@ -156,6 +158,7 @@ export default function BillForm() {
     discountAmount,
     discountIsPercent,
     simpleBill, // print flag only — payments/balance are tracked in the app as usual
+    taxInvoice, // print this bill in the formal GST tax-invoice format
     receivedAmount,
     gstEnabled: companyIsGst ? gstEnabled : false,
     gstInclusive: companyIsGst && gstEnabled ? gstInclusive : false,
@@ -255,17 +258,27 @@ export default function BillForm() {
               <div>
                 <label className="label">Bill format</label>
                 <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-sm">
-                  <button type="button" onClick={() => setSimpleBill(false)}
-                    className={`rounded-md px-3 py-1.5 font-medium ${!simpleBill ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                  <button type="button" onClick={() => { setSimpleBill(false); setTaxInvoice(false) }}
+                    className={`rounded-md px-3 py-1.5 font-medium ${!simpleBill && !taxInvoice ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
                     title="Shows received, balance and payment tracking">
                     Standard
                   </button>
-                  <button type="button" onClick={() => setSimpleBill(true)}
-                    className={`rounded-md px-3 py-1.5 font-medium ${simpleBill ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                  <button type="button" onClick={() => { setSimpleBill(true); setTaxInvoice(false) }}
+                    className={`rounded-md px-3 py-1.5 font-medium ${simpleBill && !taxInvoice ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
                     title="Plain cash bill — no balance / received / payment shown">
                     Simple (cash)
                   </button>
+                  <button type="button" onClick={() => { setTaxInvoice(true); setSimpleBill(false) }}
+                    className={`rounded-md px-3 py-1.5 font-medium ${taxInvoice ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}
+                    title="Formal GST tax invoice — per-line CGST/SGST columns (like a Tally invoice)">
+                    Tax Invoice
+                  </button>
                 </div>
+                {taxInvoice && (
+                  <p className="mt-1 text-xs text-brand-600">
+                    Prints in GST tax-invoice format with per-line CGST/SGST{companyIsGst ? '' : ' (needs a GST company to show tax)'}.
+                  </p>
+                )}
               </div>
 
               <div>
