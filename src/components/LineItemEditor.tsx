@@ -16,6 +16,9 @@ interface Props {
   showCost?: boolean // per-line original/cost price (never printed; profit only)
 }
 
+// Common units of measure for the "per" column (editable — users can type any value).
+const COMMON_UNITS = ['nos', 'pcs', 'mtr', 'sqft', 'sqmtr', 'kg', 'gm', 'ltr', 'set', 'box', 'pkt', 'roll', 'hrs']
+
 export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxRate, showCost = false }: Props) {
   const { db } = useStore()
   
@@ -32,7 +35,7 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
   const addRow = () =>
     onChange([
       ...items,
-      { id: uid(), description: '', qty: 1, rate: 0, hsnSac: '', taxRate: gstMode ? defaultTaxRate : undefined },
+      { id: uid(), description: '', qty: 1, unit: 'nos', rate: 0, hsnSac: '', taxRate: gstMode ? defaultTaxRate : undefined },
     ])
 
   const removeRow = (id: string) => onChange(items.filter((it) => it.id !== id))
@@ -46,7 +49,7 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
   }
 
   const gross = items.reduce((s, it) => s + lineTotal(it), 0)
-  const totalCols = 6 + (gstMode ? 2 : 0) + (showCost ? 1 : 0)
+  const totalCols = 7 + (gstMode ? 2 : 0) + (showCost ? 1 : 0)
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200">
@@ -57,6 +60,7 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
             <th className="th">Description</th>
             {gstMode && <th className="th w-24">HSN/SAC</th>}
             <th className="th w-20 text-right">Qty</th>
+            <th className="th w-20">Unit</th>
             <th className="th w-28 text-right">Rate</th>
             {showCost && <th className="th w-28 text-right text-amber-600" title="Not printed — profit report only">Cost*</th>}
             {gstMode && <th className="th w-20 text-right">GST%</th>}
@@ -99,6 +103,15 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
                     value={it.qty}
                     onChange={(e) => update(it.id, { qty: parseFloat(e.target.value) || 0 })}
                     onKeyDown={(e) => onKeyDown(e, isLast)}
+                  />
+                </td>
+                <td className="td">
+                  <input
+                    className="input"
+                    list="unit-options"
+                    value={it.unit ?? ''}
+                    placeholder="nos"
+                    onChange={(e) => update(it.id, { unit: e.target.value })}
                   />
                 </td>
                 <td className="td">
@@ -175,6 +188,9 @@ export function LineItemEditor({ items, onChange, gstMode, taxRates, defaultTaxR
           </tr>
         </tfoot>
       </table>
+      <datalist id="unit-options">
+        {COMMON_UNITS.map((u) => <option key={u} value={u} />)}
+      </datalist>
       {showCost && (
         <p className="border-t border-slate-100 bg-amber-50/50 px-3 py-1.5 text-xs text-amber-700">
           * Cost is your original/buying price — used only for the profit report and never shown on the printed bill or quote.

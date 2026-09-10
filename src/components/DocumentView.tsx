@@ -842,7 +842,7 @@ function TaxInvoiceTemplate({ ctx }: { ctx: Ctx }) {
                 <td className={`${cellL} font-medium text-slate-900`}>{it.description}</td>
                 {gst && <td className={cellC}>{it.hsnSac || '—'}</td>}
                 <td className={cellR}>{it.qty}</td>
-                <td className={cellC}>nos</td>
+                <td className={cellC}>{it.unit || 'nos'}</td>
                 <td className={cellR}>{formatINR(displayRate, false)}</td>
                 <td className={`${cellR} font-semibold`}>{formatINR(gst ? lx.taxable : lineTotal(it), false)}</td>
                 {gst && !interState && <>

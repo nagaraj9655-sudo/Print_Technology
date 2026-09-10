@@ -39,7 +39,7 @@ export function BillFormScreen() {
   const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? '')
   const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? '')
   const [customerGstin, setCustomerGstin] = useState(existing?.customerGstin ?? '')
-  const [items, setItems] = useState<LineItem[]>(existing?.items ?? [{ id: uid(), description: '', qty: 1, rate: 0 }])
+  const [items, setItems] = useState<LineItem[]>(existing?.items ?? [{ id: uid(), description: '', qty: 1, unit: 'nos', rate: 0 }])
   const [discountAmount, setDiscountAmount] = useState(String(existing?.discountAmount ?? ''))
   const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
   const [taxMode, setTaxMode] = useState<GstMode>(

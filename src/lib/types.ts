@@ -82,6 +82,7 @@ export interface LineItem {
   id: ID
   description: string // Service_Description
   qty: number // Qty
+  unit?: string // unit of measure shown in the "per" column (nos, mtr, kg, set…); defaults to "nos"
   rate: number // Per_Rate (selling rate, printed)
   cost?: number // Original/cost price per unit — NEVER printed; profit report only
   hsnSac?: string // hsn_sac (GST only)

@@ -74,6 +74,7 @@ export interface LineItem {
   id: ID
   description: string
   qty: number
+  unit?: string // unit of measure shown in the "per" column (nos, mtr, kg, set…); defaults to "nos"
   rate: number
   cost?: number
   hsnSac?: string

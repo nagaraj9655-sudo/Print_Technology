@@ -192,7 +192,7 @@ function buildTaxInvoiceHtml(
       <td class="l">${esc(it.description)}</td>
       ${gst ? `<td class="c">${esc(it.hsnSac || '—')}</td>` : ''}
       <td class="r">${it.qty}</td>
-      <td class="c">nos</td>
+      <td class="c">${esc(it.unit || 'nos')}</td>
       <td class="r">${money(displayRate)}</td>
       <td class="r b">${money(gst ? taxable : lt)}</td>
       ${gst && !interState ? `<td class="r">${rate / 2}%</td><td class="r">${money(cgst)}</td><td class="r">${rate / 2}%</td><td class="r">${money(sgst)}</td>` : ''}

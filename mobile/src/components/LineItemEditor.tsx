@@ -24,7 +24,7 @@ export function LineItemEditor({
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const update = (id: string, patch: Partial<LineItem>) => onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
   const remove = (id: string) => onChange(items.filter((it) => it.id !== id))
-  const add = () => onChange([...items, { id: uid(), description: '', qty: 1, rate: 0, taxRate: gstMode ? taxRates[taxRates.length - 1] ?? 18 : undefined }])
+  const add = () => onChange([...items, { id: uid(), description: '', qty: 1, unit: 'nos', rate: 0, taxRate: gstMode ? taxRates[taxRates.length - 1] ?? 18 : undefined }])
 
   // Unique descriptions used on past bills/quotes — offered as you type.
   const pastDescriptions = useMemo(() => {
@@ -85,6 +85,9 @@ export function LineItemEditor({
           <View style={styles.row}>
             <MiniField label="Qty">
               <TextInput keyboardType="numeric" value={String(it.qty ?? '')} onChangeText={(t) => update(it.id, { qty: num(t) })} style={styles.mini} placeholderTextColor={colors.textFaint} />
+            </MiniField>
+            <MiniField label="Unit">
+              <TextInput value={it.unit ?? ''} onChangeText={(t) => update(it.id, { unit: t })} style={styles.mini} placeholder="nos" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
             </MiniField>
             <MiniField label="Rate ₹">
               <TextInput keyboardType="numeric" value={String(it.rate ?? '')} onChangeText={(t) => update(it.id, { rate: num(t) })} style={styles.mini} placeholderTextColor={colors.textFaint} />

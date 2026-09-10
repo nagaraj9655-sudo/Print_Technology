@@ -35,7 +35,7 @@ export default function QuoteForm() {
   const [items, setItems] = useState<LineItem[]>(
     existing?.items.length
       ? existing.items.map((i) => ({ ...i }))
-      : [{ id: uid(), description: '', qty: 1, rate: 0, hsnSac: '', taxRate: db.settings.defaultTaxRate }],
+      : [{ id: uid(), description: '', qty: 1, unit: 'nos', rate: 0, hsnSac: '', taxRate: db.settings.defaultTaxRate }],
   )
   const [discountAmount, setDiscountAmount] = useState(existing?.discountAmount ?? 0)
   const [discountIsPercent, setDiscountIsPercent] = useState(existing?.discountIsPercent ?? false)
