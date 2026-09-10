@@ -858,6 +858,14 @@ function TaxInvoiceTemplate({ ctx }: { ctx: Ctx }) {
               </tr>
             )
           })}
+          {/* Blank filler rows — keep the ruled table a fixed minimum height (like a printed tax-invoice book) */}
+          {Array.from({ length: Math.max(0, 10 - doc.items.length) }).map((_, i) => (
+            <tr key={`filler-${i}`}>
+              {Array.from({ length: gst ? (interState ? 9 : 11) : 6 }).map((__, j) => (
+                <td key={j} className={j === 1 ? cellL : cellR}>&nbsp;</td>
+              ))}
+            </tr>
+          ))}
           {/* SubTotal */}
           <tr className="font-bold text-slate-900">
             <td className={cellL} colSpan={gst ? 3 : 2}>Subtotal</td>

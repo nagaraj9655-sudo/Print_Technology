@@ -200,6 +200,12 @@ function buildTaxInvoiceHtml(
     </tr>`
   }).join('')
 
+  // Blank filler rows — keep the ruled table a fixed minimum height (10 rows), like a printed tax-invoice book.
+  const bodyCols = gst ? (interState ? 9 : 11) : 6
+  const fillerRows = Array.from({ length: Math.max(0, 10 - items.length) })
+    .map(() => `<tr>${'<td>&nbsp;</td>'.repeat(bodyCols)}</tr>`)
+    .join('')
+
   const grand = Math.round(totals.net)
   const roundoff = round2(grand - totals.net)
   const totalQty = items.reduce((s, it) => s + (it.qty || 0), 0)
@@ -301,6 +307,7 @@ function buildTaxInvoiceHtml(
       </thead>
       <tbody>
         ${line}
+        ${fillerRows}
         <tr class="b">
           <td class="l" colspan="${gst ? 3 : 2}"><b>Subtotal</b></td>
           <td class="r"><b>${totalQty}</b></td>
