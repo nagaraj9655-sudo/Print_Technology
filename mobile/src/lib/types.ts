@@ -4,7 +4,7 @@ export type ID = string
 
 export type Role = 'Admin' | 'Operator'
 
-export type DocTemplate = 'modern' | 'classic' | 'minimal' | 'elegant' | 'bold' | 'grid'
+export type DocTemplate = 'modern' | 'classic' | 'minimal' | 'elegant' | 'bold' | 'grid' | 'tax'
 
 // Tax mode chosen per document (default configurable per company).
 export type GstMode = 'inclusive' | 'exclusive' | 'none'

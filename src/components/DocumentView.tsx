@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import type { Bill, Company, DocTemplate, Quotation, Settings } from '../lib/types'
-import { billTotals, docUsesGst, lineTotal, quoteTotals, recipientInterState, type Totals } from '../lib/calc'
+import { billTotals, docUsesGst, lineTotal, quoteTotals, recipientInterState, round2, type Totals } from '../lib/calc'
 import { amountInWords, formatDate, formatINR } from '../lib/format'
 import { UpiQr } from './UpiQr'
 
@@ -33,6 +33,7 @@ function templateFont(t: DocTemplate): string {
     case 'elegant': return "'Playfair Display', Georgia, serif"
     case 'bold': return "'Roboto Slab', Georgia, serif"
     case 'modern': return "'Poppins', 'Inter', sans-serif"
+    case 'tax': return "'Inter', system-ui, sans-serif"
     default: return "'Inter', system-ui, sans-serif"
   }
 }
@@ -692,6 +693,326 @@ function GridTemplate({ ctx }: { ctx: Ctx }) {
   )
 }
 
+/* ================================================================== */
+/* TEMPLATE 7 — TAX INVOICE (formal Tally/Busy-style GST layout)        */
+/* Fully-bordered table with per-line CGST/SGST (or IGST) split,        */
+/* tax summary, amount-in-words, bank details, declaration & seal.      */
+/* ================================================================== */
+
+interface LineTax {
+  taxable: number
+  rate: number // full GST % on the line
+  cgst: number
+  sgst: number
+  igst: number
+  tax: number
+}
+
+// Per-line tax split — mirrors calc.ts (proportional discount, inclusive back-out).
+function perLineTaxes(ctx: Ctx): LineTax[] {
+  const { doc, gst, inclusive, interState, t } = ctx
+  const gross = doc.items.reduce((s, it) => s + lineTotal(it), 0)
+  const ratio = gross > 0 ? t.discount / gross : 0
+  return doc.items.map((it) => {
+    const rate = it.taxRate ?? 0
+    const lt = lineTotal(it)
+    let taxable: number
+    let tax: number
+    if (!gst) {
+      taxable = round2(lt * (1 - ratio))
+      tax = 0
+    } else if (inclusive) {
+      const incl = round2(lt * (1 - ratio))
+      taxable = round2(incl / (1 + rate / 100))
+      tax = round2(incl - taxable)
+    } else {
+      taxable = round2(lt * (1 - ratio))
+      tax = round2((taxable * rate) / 100)
+    }
+    const cgst = interState ? 0 : round2(tax / 2)
+    const sgst = interState ? 0 : round2(tax - cgst)
+    const igst = interState ? tax : 0
+    return { taxable, rate, cgst, sgst, igst, tax }
+  })
+}
+
+function TaxInvoiceTemplate({ ctx }: { ctx: Ctx }) {
+  const { company, gst, accent, isBill, title, docNo, doc, validUntil, interState, inclusive, showHeader, settings, topMm, t } = ctx
+  const bd = 'border border-slate-500'
+  const rows = perLineTaxes(ctx)
+  const grandTotal = Math.round(t.net)
+  const roundoff = round2(grandTotal - t.net)
+  // For inter-state, CGST+SGST collapse into a single IGST column pair.
+  const cols = interState ? 9 : 11
+  const cellR = `${bd} px-1.5 py-1 text-right tnum align-top`
+  const cellL = `${bd} px-1.5 py-1 text-left align-top`
+  const cellC = `${bd} px-1.5 py-1 text-center align-top`
+  const th = `${bd} px-1.5 py-1 text-[10px] font-bold uppercase leading-tight`
+
+  return (
+    <div className="p-4 text-[11px] text-slate-800 print:p-2">
+      {showHeader ? (
+        <div className="text-center text-sm font-bold uppercase tracking-[0.3em]" style={{ color: accent }}>{title}</div>
+      ) : (
+        <>
+          <LetterheadSpacer mm={topMm} />
+          <div className="text-center text-sm font-bold uppercase tracking-[0.3em]" style={{ color: accent }}>{title}</div>
+        </>
+      )}
+
+      {/* ---- Supplier + invoice meta + buyer (bordered) ---- */}
+      <div className={`mt-1 ${bd} border-b-0`}>
+        <div className="grid grid-cols-2">
+          {/* Supplier */}
+          <div className="border-r border-slate-500 p-2">
+            {showHeader && (
+              <div className="flex items-start gap-2">
+                {company?.logoDataUrl && <img src={company.logoDataUrl} alt="" className="h-10 w-10 object-contain" />}
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{company?.name}</p>
+                  <p className="whitespace-pre-line leading-snug text-slate-700">{company?.address}</p>
+                  {gst && company?.gstin && <p className="mt-0.5"><span className="text-slate-600">GSTIN/UIN:</span> <span className="font-semibold">{company.gstin}</span></p>}
+                  {company?.email && <p><span className="text-slate-600">E-mail:</span> {company.email}</p>}
+                  {company?.phone && <p><span className="text-slate-600">Cell:</span> {company.phone}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Invoice meta grid */}
+          <div className="grid grid-cols-2 text-[10px]">
+            <MetaCell label={isBill ? 'Invoice No.' : 'Quote No.'} value={docNo} strong />
+            <MetaCell label="Date" value={formatDate(doc.date)} />
+            <MetaCell label="Mode/Terms of Payment" value={company?.terms ? '' : ''} />
+            <MetaCell label={validUntil ? 'Valid Until' : 'Supplier’s Ref.'} value={validUntil ? formatDate(validUntil) : ''} />
+            <MetaCell label="Other Reference(s)" value="" />
+            <MetaCell label="Terms of Delivery" value="" last />
+          </div>
+        </div>
+        {/* Buyer */}
+        <div className="border-t border-slate-500 p-2">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Buyer (Bill To)</p>
+          <p className="text-sm font-bold text-slate-900">{doc.customerName || '—'}</p>
+          <p className="whitespace-pre-line leading-snug text-slate-700">{doc.customerAddress}</p>
+          {doc.customerPhone && <p className="text-slate-700">☎ {doc.customerPhone}</p>}
+          <div className="mt-0.5 flex flex-wrap gap-x-6">
+            {gst && doc.customerGstin && <p><span className="text-slate-600">GSTIN/UIN:</span> <span className="font-semibold">{doc.customerGstin}</span></p>}
+            {gst && <p><span className="text-slate-600">Supply:</span> {interState ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)'}</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* ---- Items table ---- */}
+      <table className="w-full border-collapse">
+        <thead>
+          <tr style={{ color: accent }}>
+            <th className={`${th} text-center`} rowSpan={2}>S.<br />No</th>
+            <th className={`${th} text-left`} rowSpan={2}>Description of Goods</th>
+            {gst && <th className={`${th} text-center`} rowSpan={2}>HSN/<br />SAC</th>}
+            <th className={`${th} text-right`} rowSpan={2}>Qty</th>
+            <th className={`${th} text-center`} rowSpan={2}>per</th>
+            <th className={`${th} text-right`} rowSpan={2}>Rate</th>
+            <th className={`${th} text-right`} rowSpan={2}>{gst ? 'Taxable Value' : 'Amount'}</th>
+            {gst && !interState && <th className={`${th} text-center`} colSpan={2}>CGST</th>}
+            {gst && !interState && <th className={`${th} text-center`} colSpan={2}>SGST</th>}
+            {gst && interState && <th className={`${th} text-center`} colSpan={2}>IGST</th>}
+          </tr>
+          {gst && (
+            <tr style={{ color: accent }}>
+              <th className={`${th} text-right`}>Rate</th>
+              <th className={`${th} text-right`}>Amount</th>
+              {!interState && <>
+                <th className={`${th} text-right`}>Rate</th>
+                <th className={`${th} text-right`}>Amount</th>
+              </>}
+            </tr>
+          )}
+        </thead>
+        <tbody>
+          {doc.items.map((it, i) => {
+            const lx = rows[i]
+            // Inclusive pricing: show the ex-GST unit rate so Qty × Rate = Taxable Value
+            // reads correctly on the tax invoice (tax is then added via the CGST/SGST cols).
+            const displayRate = gst && inclusive && it.qty ? round2(lx.taxable / it.qty) : it.rate
+            return (
+              <tr key={it.id}>
+                <td className={cellC}>{i + 1}</td>
+                <td className={`${cellL} font-medium text-slate-900`}>{it.description}</td>
+                {gst && <td className={cellC}>{it.hsnSac || '—'}</td>}
+                <td className={cellR}>{it.qty}</td>
+                <td className={cellC}>nos</td>
+                <td className={cellR}>{formatINR(displayRate, false)}</td>
+                <td className={`${cellR} font-semibold`}>{formatINR(gst ? lx.taxable : lineTotal(it), false)}</td>
+                {gst && !interState && <>
+                  <td className={cellR}>{lx.rate / 2}%</td>
+                  <td className={cellR}>{formatINR(lx.cgst, false)}</td>
+                  <td className={cellR}>{lx.rate / 2}%</td>
+                  <td className={cellR}>{formatINR(lx.sgst, false)}</td>
+                </>}
+                {gst && interState && <>
+                  <td className={cellR}>{lx.rate}%</td>
+                  <td className={cellR}>{formatINR(lx.igst, false)}</td>
+                </>}
+              </tr>
+            )
+          })}
+          {/* SubTotal */}
+          <tr className="font-bold text-slate-900">
+            <td className={cellL} colSpan={gst ? 3 : 2}>Subtotal</td>
+            <td className={cellR}>{doc.items.reduce((s, it) => s + (it.qty || 0), 0)}</td>
+            <td className={cellC}></td>
+            <td className={cellR}></td>
+            <td className={cellR}>{formatINR(gst ? t.taxable : t.gross, false)}</td>
+            {gst && !interState && <>
+              <td className={cellR}></td>
+              <td className={cellR}>{formatINR(t.cgst, false)}</td>
+              <td className={cellR}></td>
+              <td className={cellR}>{formatINR(t.sgst, false)}</td>
+            </>}
+            {gst && interState && <>
+              <td className={cellR}></td>
+              <td className={cellR}>{formatINR(t.igst, false)}</td>
+            </>}
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ---- Totals summary ---- */}
+      <table className="w-full border-collapse">
+        <tbody>
+          {t.discount > 0 && (
+            <tr>
+              <td className={`${bd} border-t-0 px-1.5 py-1 text-right`} colSpan={cols - 1}>Discount</td>
+              <td className={`${bd} border-t-0 px-1.5 py-1 text-right tnum`}>{`− ${formatINR(t.discount, false)}`}</td>
+            </tr>
+          )}
+          {gst && (
+            <tr>
+              <td className={`${bd} border-t-0 px-1.5 py-1 text-right font-semibold`} colSpan={cols - 1}>Total Tax Amount</td>
+              <td className={`${bd} border-t-0 px-1.5 py-1 text-right tnum font-semibold`}>{formatINR(t.tax, false)}</td>
+            </tr>
+          )}
+          {roundoff !== 0 && (
+            <tr>
+              <td className={`${bd} border-t-0 px-1.5 py-1 text-right`} colSpan={cols - 1}>Round Off</td>
+              <td className={`${bd} border-t-0 px-1.5 py-1 text-right tnum`}>{formatINR(roundoff, false)}</td>
+            </tr>
+          )}
+          <tr className="text-sm font-extrabold" style={{ color: accent }}>
+            <td className={`${bd} border-t-0 px-1.5 py-1.5 text-right`} colSpan={cols - 1}>Grand Total</td>
+            <td className={`${bd} border-t-0 px-1.5 py-1.5 text-right tnum`}>{formatINR(grandTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ---- Amount in words ---- */}
+      <div className={`${bd} border-t-0 px-2 py-1.5`}>
+        <span className="text-slate-600">Amount Chargeable (in words):</span>{' '}
+        <span className="font-semibold text-slate-900">{amountInWords(grandTotal)}</span>
+        <span className="float-right text-[10px] italic text-slate-500">E. &amp; O.E</span>
+      </div>
+
+      {/* ---- Tax summary (HSN-wise consolidated) ---- */}
+      {gst && (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr style={{ color: accent }}>
+              <th className={`${th} text-left`} rowSpan={2}>Taxable<br />Value</th>
+              {!interState ? (
+                <>
+                  <th className={`${th} text-center`} colSpan={2}>CGST</th>
+                  <th className={`${th} text-center`} colSpan={2}>SGST</th>
+                </>
+              ) : (
+                <th className={`${th} text-center`} colSpan={2}>IGST</th>
+              )}
+              <th className={`${th} text-right`} rowSpan={2}>Total<br />Tax Amount</th>
+            </tr>
+            <tr style={{ color: accent }}>
+              <th className={`${th} text-right`}>Rate</th>
+              <th className={`${th} text-right`}>Amount</th>
+              {!interState && <>
+                <th className={`${th} text-right`}>Rate</th>
+                <th className={`${th} text-right`}>Amount</th>
+              </>}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="font-semibold text-slate-900">
+              <td className={cellR}>{formatINR(t.taxable, false)}</td>
+              {!interState ? (
+                <>
+                  <td className={cellR}>{formatINR(t.cgst, false)}</td>
+                  <td className={cellR}>{formatINR(t.cgst, false)}</td>
+                  <td className={cellR}>{formatINR(t.sgst, false)}</td>
+                  <td className={cellR}>{formatINR(t.sgst, false)}</td>
+                </>
+              ) : (
+                <>
+                  <td className={cellR}></td>
+                  <td className={cellR}>{formatINR(t.igst, false)}</td>
+                </>
+              )}
+              <td className={cellR}>{formatINR(t.tax, false)}</td>
+            </tr>
+            <tr className="text-slate-600">
+              <td className={`${bd} px-1.5 py-1 text-left`} colSpan={interState ? 2 : 4}>
+                Tax Amount (in words): <span className="font-semibold text-slate-900">{amountInWords(t.tax)}</span>
+              </td>
+              <td className={`${bd} px-1.5 py-1 text-right`}></td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* ---- Bank + declaration + signature ---- */}
+      <div className={`${bd} ${gst ? 'border-t-0' : ''} grid grid-cols-2`}>
+        <div className="border-r border-slate-500 p-2">
+          {company?.bankDetails && (
+            <div className="mb-2">
+              <p className="font-bold text-slate-700">Bank Details</p>
+              <p className="whitespace-pre-line leading-snug text-slate-700">{company.bankDetails}</p>
+            </div>
+          )}
+          {company?.upiId && <p className="text-slate-700">UPI: {company.upiId}</p>}
+          <div className="mt-2">
+            <p className="font-bold text-slate-700">Declaration</p>
+            <p className="leading-snug text-slate-600">
+              {company?.terms || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col justify-between p-2">
+          <div className="flex items-start justify-end">
+            <PaymentQr ctx={ctx} size={72} />
+          </div>
+          <div className="text-right">
+            <p className="text-slate-700">For {company?.name}</p>
+            {company?.signatureDataUrl ? (
+              <img src={company.signatureDataUrl} alt="signature" className="ml-auto mt-1 h-12 object-contain" />
+            ) : (
+              <div className="mt-10" />
+            )}
+            <div className="border-t border-slate-400 pt-0.5 text-slate-800">{company?.signatoryName || 'Authorised Signatory'}</div>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-1 text-center text-[9px] text-slate-500">{settings.invoiceFooter || 'This is a Computer Generated Invoice. Signature not required.'}</p>
+      <FooterImage ctx={ctx} />
+    </div>
+  )
+}
+
+// Small labeled cell used in the Tax-invoice meta grid.
+function MetaCell({ label, value, strong, last }: { label: string; value: string; strong?: boolean; last?: boolean }) {
+  return (
+    <div className={`border-b border-l border-slate-500 px-1.5 py-1 ${last ? 'border-b-0' : ''}`}>
+      <span className="block text-[9px] uppercase text-slate-500">{label}</span>
+      <span className={strong ? 'font-bold text-slate-900' : 'text-slate-800'}>{value || ' '}</span>
+    </div>
+  )
+}
+
 const TEMPLATES: Record<DocTemplate, FC<{ ctx: Ctx }>> = {
   modern: ModernTemplate,
   classic: ClassicTemplate,
@@ -699,4 +1020,5 @@ const TEMPLATES: Record<DocTemplate, FC<{ ctx: Ctx }>> = {
   elegant: ElegantTemplate,
   bold: BoldTemplate,
   grid: GridTemplate,
+  tax: TaxInvoiceTemplate,
 }

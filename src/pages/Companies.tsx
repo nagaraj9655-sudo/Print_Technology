@@ -290,6 +290,7 @@ function CompanyModal({
             <option value="elegant">Elegant — framed, Playfair serif</option>
             <option value="bold">Bold — heavy slab, thick rules</option>
             <option value="grid">Grid — bordered GST-style cells</option>
+            <option value="tax">Tax Invoice — GST tabular (CGST/SGST columns)</option>
           </select>
         </div>
         <div>

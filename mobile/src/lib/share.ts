@@ -9,7 +9,7 @@ import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import * as MailComposer from 'expo-mail-composer'
 import type { Bill, Company, Quotation, Settings } from './types'
-import { billTotals, quoteTotals, lineTotal, docUsesGst, recipientInterState } from './calc'
+import { billTotals, quoteTotals, lineTotal, docUsesGst, recipientInterState, round2 } from './calc'
 import { amountInWords, formatDate, formatINR } from './format'
 import { normalizePhone } from './payments'
 
@@ -42,6 +42,9 @@ export function buildDocHtml(opts: {
   const { company, meta, customer, items, totals, gst, interState, footer, simple } = opts
   const accent = company?.accent || '#4f46e5'
   const title = meta.isQuote ? 'QUOTATION' : (gst ? 'TAX INVOICE' : 'INVOICE')
+
+  // Formal Tally/Busy-style GST tax invoice (per-line CGST/SGST columns).
+  if (company?.template === 'tax') return buildTaxInvoiceHtml(opts, title, accent)
 
   const itemRows = items.map((it, i) => `
     <tr>
@@ -147,6 +150,186 @@ export function buildDocHtml(opts: {
     ${company?.bankDetails ? `<div class="pay"><b>Bank:</b> ${esc(company.bankDetails)}</div>` : ''}
     ${footer || company?.terms ? `<div class="foot">${esc(footer || company?.terms || '')}</div>` : ''}
     <div class="sign">For ${esc(company?.name ?? '')}${signImg || '<br/><br/>'}${company?.signatoryName ? `<div style="font-weight:700;color:#0f172a">${esc(company.signatoryName)}</div>` : ''}<div>Authorised Signatory</div></div>
+    ${footerImg}
+  </body></html>`
+}
+
+// ---- Tax Invoice (GST tabular) HTML — per-line CGST/SGST split ----
+function buildTaxInvoiceHtml(
+  opts: Parameters<typeof buildDocHtml>[0],
+  title: string,
+  accent: string,
+): string {
+  const { company, meta, customer, items, totals, gst, interState, footer } = opts
+  const gross = items.reduce((s, it) => s + lineTotal(it), 0)
+  const ratio = gross > 0 ? totals.discount / gross : 0
+  // Inclusive detection: taxable materially below (gross − discount) ⇒ tax was backed out.
+  const inclusive = gst && totals.taxable < round2(gross - totals.discount) - 0.01
+
+  const line = items.map((it, i) => {
+    const rate = it.taxRate ?? 0
+    const lt = lineTotal(it)
+    let taxable: number
+    let tax: number
+    if (!gst) { taxable = round2(lt * (1 - ratio)); tax = 0 }
+    else if (inclusive) {
+      const incl = round2(lt * (1 - ratio))
+      taxable = round2(incl / (1 + rate / 100))
+      tax = round2(incl - taxable)
+    } else {
+      taxable = round2(lt * (1 - ratio))
+      tax = round2((taxable * rate) / 100)
+    }
+    const cgst = interState ? 0 : round2(tax / 2)
+    const sgst = interState ? 0 : round2(tax - cgst)
+    const igst = interState ? tax : 0
+    // Inclusive pricing: show ex-GST unit rate so Qty × Rate = Taxable Value on the invoice.
+    const displayRate = gst && inclusive && it.qty ? round2(taxable / it.qty) : it.rate
+    return `<tr>
+      <td class="c">${i + 1}</td>
+      <td class="l">${esc(it.description)}</td>
+      ${gst ? `<td class="c">${esc(it.hsnSac || '—')}</td>` : ''}
+      <td class="r">${it.qty}</td>
+      <td class="c">nos</td>
+      <td class="r">${money(displayRate)}</td>
+      <td class="r b">${money(gst ? taxable : lt)}</td>
+      ${gst && !interState ? `<td class="r">${rate / 2}%</td><td class="r">${money(cgst)}</td><td class="r">${rate / 2}%</td><td class="r">${money(sgst)}</td>` : ''}
+      ${gst && interState ? `<td class="r">${rate}%</td><td class="r">${money(igst)}</td>` : ''}
+    </tr>`
+  }).join('')
+
+  const grand = Math.round(totals.net)
+  const roundoff = round2(grand - totals.net)
+  const totalQty = items.reduce((s, it) => s + (it.qty || 0), 0)
+  const cols = interState ? 9 : 11
+  const taxHead = gst
+    ? (!interState
+        ? `<th class="c" colspan="2">CGST</th><th class="c" colspan="2">SGST</th>`
+        : `<th class="c" colspan="2">IGST</th>`)
+    : ''
+  const taxSubHead = gst
+    ? (!interState
+        ? `<th class="r">Rate</th><th class="r">Amt</th><th class="r">Rate</th><th class="r">Amt</th>`
+        : `<th class="r">Rate</th><th class="r">Amt</th>`)
+    : ''
+  const subCells = gst
+    ? (!interState
+        ? `<td></td><td class="r b">${money(totals.cgst)}</td><td></td><td class="r b">${money(totals.sgst)}</td>`
+        : `<td></td><td class="r b">${money(totals.igst)}</td>`)
+    : ''
+
+  const logo = company?.logoDataUrl ? `<img src="${company.logoDataUrl}" style="max-height:44px;max-width:150px;margin-bottom:4px" />` : ''
+  const signImg = company?.signatureDataUrl ? `<img src="${company.signatureDataUrl}" style="max-height:44px;max-width:150px;display:block;margin-left:auto" />` : ''
+  const footerImg = company?.footerImageDataUrl
+    ? `<div style="margin-top:12px;text-align:center"><img src="${company.footerImageDataUrl}" style="${company.footerImageWidthMm ? `width:${company.footerImageWidthMm}mm;` : 'max-width:100%;'}${company.footerImageHeightMm ? `height:${company.footerImageHeightMm}mm;` : ''}" /></div>`
+    : ''
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, 'Helvetica Neue', Roboto, Arial, sans-serif; color: #0f172a; margin: 0; padding: 18px; font-size: 10.5px; }
+    .title { text-align: center; font-size: 14px; font-weight: 800; letter-spacing: 4px; color: ${accent}; text-transform: uppercase; }
+    .frame { border: 1px solid #475569; margin-top: 4px; }
+    .frame .split { display: flex; }
+    .frame .split > div { flex: 1; padding: 7px; }
+    .frame .split > div:first-child { border-right: 1px solid #475569; }
+    .cname { font-size: 13px; font-weight: 800; }
+    .muted { color: #475569; line-height: 1.45; white-space: pre-line; }
+    .meta div { display: flex; justify-content: space-between; padding: 1px 0; }
+    .meta .k { color: #64748b; }
+    .buyer { border-top: 1px solid #475569; padding: 7px; }
+    .lbl { color: #94a3b8; text-transform: uppercase; font-size: 8.5px; letter-spacing: 0.5px; }
+    table.items { width: 100%; border-collapse: collapse; }
+    table.items th, table.items td { border: 1px solid #475569; padding: 3px 4px; font-size: 9.5px; }
+    table.items th { color: ${accent}; text-transform: uppercase; font-size: 8.5px; }
+    table.items td.r, table.items th.r { text-align: right; }
+    table.items td.c, table.items th.c { text-align: center; }
+    table.items td.l { text-align: left; }
+    table.items td.b { font-weight: 700; }
+    table.sum { width: 100%; border-collapse: collapse; }
+    table.sum td { border: 1px solid #475569; border-top: 0; padding: 3px 6px; }
+    .grand td { font-weight: 800; font-size: 12px; color: ${accent}; }
+    .words { border: 1px solid #475569; border-top: 0; padding: 5px 6px; }
+    .foot { display: flex; border: 1px solid #475569; border-top: 0; }
+    .foot > div { flex: 1; padding: 7px; }
+    .foot > div:first-child { border-right: 1px solid #475569; }
+    .sign { text-align: right; margin-top: 26px; }
+    .gen { text-align: center; color: #64748b; font-size: 8.5px; margin-top: 4px; }
+  </style></head><body>
+    <div class="title">${title}</div>
+    <div class="frame">
+      <div class="split">
+        <div>
+          ${logo}
+          <div class="cname">${esc(company?.name ?? 'Company')}</div>
+          <div class="muted">${esc(company?.address ?? '')}</div>
+          ${company?.gstin ? `<div><span class="k">GSTIN/UIN:</span> <b>${esc(company.gstin)}</b></div>` : ''}
+          ${company?.email ? `<div><span class="k">E-mail:</span> ${esc(company.email)}</div>` : ''}
+          ${company?.phone ? `<div><span class="k">Cell:</span> ${esc(company.phone)}</div>` : ''}
+        </div>
+        <div class="meta">
+          <div><span class="k">${meta.isQuote ? 'Quote No.' : 'Invoice No.'}</span><b>${esc(meta.no)}</b></div>
+          <div><span class="k">Date</span><span>${esc(formatDate(meta.date))}</span></div>
+          ${meta.validUntil ? `<div><span class="k">Valid Until</span><span>${esc(formatDate(meta.validUntil))}</span></div>` : ''}
+          ${gst ? `<div><span class="k">Supply</span><span>${interState ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)'}</span></div>` : ''}
+        </div>
+      </div>
+      <div class="buyer">
+        <div class="lbl">Buyer (Bill To)</div>
+        <div class="cname">${esc(customer.name || '—')}</div>
+        <div class="muted">${esc(customer.address ?? '')}${customer.phone ? `\n☎ ${esc(customer.phone)}` : ''}</div>
+        ${customer.gstin ? `<div><span class="k">GSTIN/UIN:</span> <b>${esc(customer.gstin)}</b></div>` : ''}
+      </div>
+    </div>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th class="c" rowspan="2">S.No</th>
+          <th class="l" rowspan="2">Description of Goods</th>
+          ${gst ? '<th class="c" rowspan="2">HSN/SAC</th>' : ''}
+          <th class="r" rowspan="2">Qty</th>
+          <th class="c" rowspan="2">per</th>
+          <th class="r" rowspan="2">Rate</th>
+          <th class="r" rowspan="2">${gst ? 'Taxable Value' : 'Amount'}</th>
+          ${taxHead}
+        </tr>
+        ${gst ? `<tr>${taxSubHead}</tr>` : ''}
+      </thead>
+      <tbody>
+        ${line}
+        <tr class="b">
+          <td class="l" colspan="${gst ? 3 : 2}"><b>Subtotal</b></td>
+          <td class="r"><b>${totalQty}</b></td>
+          <td class="c"></td>
+          <td class="r"></td>
+          <td class="r b">${money(gst ? totals.taxable : totals.gross)}</td>
+          ${subCells}
+        </tr>
+      </tbody>
+    </table>
+
+    <table class="sum">
+      ${totals.discount > 0 ? `<tr><td class="r" colspan="${cols - 1}">Discount</td><td class="r">- ${money(totals.discount)}</td></tr>` : ''}
+      ${gst ? `<tr><td class="r" colspan="${cols - 1}"><b>Total Tax Amount</b></td><td class="r"><b>${money(totals.tax)}</b></td></tr>` : ''}
+      ${roundoff !== 0 ? `<tr><td class="r" colspan="${cols - 1}">Round Off</td><td class="r">${money(roundoff)}</td></tr>` : ''}
+      <tr class="grand"><td class="r" colspan="${cols - 1}">Grand Total</td><td class="r">${money(grand)}</td></tr>
+    </table>
+
+    <div class="words"><span class="k">Amount Chargeable (in words):</span> <b>${esc(amountInWords(grand))}</b></div>
+
+    <div class="foot">
+      <div>
+        ${company?.bankDetails ? `<div><b>Bank Details</b><br/><span class="muted">${esc(company.bankDetails)}</span></div>` : ''}
+        ${company?.upiId ? `<div style="margin-top:4px">UPI: ${esc(company.upiId)}</div>` : ''}
+        <div style="margin-top:6px"><b>Declaration</b><br/><span class="muted">${esc(footer || company?.terms || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.')}</span></div>
+      </div>
+      <div>
+        <div class="sign">For ${esc(company?.name ?? '')}${signImg || '<br/><br/>'}${company?.signatoryName ? `<div style="font-weight:700">${esc(company.signatoryName)}</div>` : ''}<div>Authorised Signatory</div></div>
+      </div>
+    </div>
+    <div class="gen">This is a Computer Generated Invoice.</div>
     ${footerImg}
   </body></html>`
 }

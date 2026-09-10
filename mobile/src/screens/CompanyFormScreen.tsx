@@ -15,7 +15,7 @@ import type { RootStackParamList } from '../navigation/types'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 const ACCENTS = ['#4f46e5', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#dc2626', '#4338ca']
-const TEMPLATES: DocTemplate[] = ['modern', 'classic', 'minimal', 'elegant', 'bold', 'grid']
+const TEMPLATES: DocTemplate[] = ['modern', 'classic', 'minimal', 'elegant', 'bold', 'grid', 'tax']
 const FONTS = ['Inter', 'Poppins', 'Libre Baskerville', 'Roboto', 'Lato']
 const GST_MODES: { label: string; value: GstMode }[] = [
   { label: 'Exclusive (tax added on top)', value: 'exclusive' },

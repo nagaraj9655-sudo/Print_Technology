@@ -6,8 +6,9 @@ export type ID = string
 export type Role = 'Admin' | 'Operator'
 
 // Document design template — gives each company a distinct look.
-// Six visually distinct layouts (font, header, lines, status stamp, net box all differ).
-export type DocTemplate = 'modern' | 'classic' | 'minimal' | 'elegant' | 'bold' | 'grid'
+// Seven visually distinct layouts (font, header, lines, status stamp, net box all differ).
+// 'tax' is the formal Tally/Busy-style GST tax invoice with per-line CGST/SGST columns.
+export type DocTemplate = 'modern' | 'classic' | 'minimal' | 'elegant' | 'bold' | 'grid' | 'tax'
 
 export interface User {
   id: ID
